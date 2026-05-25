@@ -1,7 +1,6 @@
 import express from "express";
 import path from "path";
 import crypto from "crypto";
-import { createServer as createViteServer } from "vite";
 import dotenv from "dotenv";
 
 // Load configuration
@@ -64,9 +63,9 @@ function authenticateToken(req: any, res: any, next: any) {
   next();
 }
 
-async function startServer() {
+async function configureApp() {
   const app = express();
-  const PORT = 3000;
+  const PORT = process.env.PORT || 3000;
 
   // JSON Body Parser with elevated limit for digital signatures
   app.use(express.json({ limit: "15mb" }));
@@ -439,6 +438,7 @@ async function startServer() {
   // VITE & STATIC FILES HANDLING
   // ==========================================
   if (process.env.NODE_ENV !== "production") {
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
@@ -452,9 +452,17 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`SANTUARI Server listening at http://0.0.0.0:${PORT}`);
+  return app;
+}
+
+// Check if running on Vercel
+if (process.env.VERCEL !== "1") {
+  configureApp().then(app => {
+    const PORT = process.env.PORT || 3000;
+    app.listen(PORT, () => {
+      console.log(`SANTUARI Server listening at http://0.0.0.0:${PORT}`);
+    });
   });
 }
 
-startServer();
+export default configureApp;
