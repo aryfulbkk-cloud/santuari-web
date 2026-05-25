@@ -1,0 +1,73 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Leaflet Custom Marker No-Border Reset */
+.leaflet-marker-icon.custom-marker {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* ================================================================
+   PRINT ZONE — hidden by default, shown only during @media print
+   ================================================================ */
+#santuari-print-root {
+  display: none;
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 10mm 10mm 15mm 10mm;
+  }
+
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  body {
+    background: white !important;
+    color: black !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Hide the entire React app (#root) during print */
+  #root {
+    display: none !important;
+  }
+
+  /* Show ONLY the cloned print zone */
+  #santuari-print-root {
+    display: block !important;
+    width: 100% !important;
+    background: white !important;
+    color: black !important;
+    font-family: 'Times New Roman', Times, serif !important;
+    font-size: 12px !important;
+    line-height: 1.6 !important;
+  }
+
+  /* Kop surat image — full A4 width */
+  .kop-surat-img {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    display: block !important;
+  }
+
+  /* Page break utilities */
+  .page-break-before-always {
+    page-break-before: always !important;
+    break-before: page !important;
+  }
+  .page-break-inside-avoid {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+}
