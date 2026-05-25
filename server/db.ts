@@ -322,6 +322,7 @@ function getLocalDB(): DatabaseSchema {
     };
     fs.writeFileSync(DB_FILE, JSON.stringify(initialData, null, 2), "utf8");
     return initialData;
+  }
   } catch (err) {
     console.warn("getLocalDB fallback failed (likely read-only filesystem on Vercel). Returning empty schema.");
     return { users: {}, pins: {}, petugas: [], tempat: [], logs: [] };
