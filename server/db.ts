@@ -229,10 +229,11 @@ interface DatabaseSchema {
 
 // Function to read JSON Database
 function getLocalDB(): DatabaseSchema {
-  if (!fs.existsSync(DB_DIR)) {
-    fs.mkdirSync(DB_DIR, { recursive: true });
-  }
-  if (!fs.existsSync(DB_FILE)) {
+  try {
+    if (!fs.existsSync(DB_DIR)) {
+      fs.mkdirSync(DB_DIR, { recursive: true });
+    }
+    if (!fs.existsSync(DB_FILE)) {
     const initialUsers: Record<string, UserAccount> = {};
     for (const key in DEFAULT_AUTH_USERS) {
       const u = DEFAULT_AUTH_USERS[key];
@@ -321,15 +322,17 @@ function getLocalDB(): DatabaseSchema {
     };
     fs.writeFileSync(DB_FILE, JSON.stringify(initialData, null, 2), "utf8");
     return initialData;
+  } catch (err) {
+    console.warn("getLocalDB fallback failed (likely read-only filesystem on Vercel). Returning empty schema.");
+    return { users: {}, pins: {}, petugas: [], tempat: [], logs: [] };
   }
 }
 
-// Function to write JSON Database
-function saveLocalDB(data: DatabaseSchema): void {
+function saveLocalDB(db: DatabaseSchema) {
   try {
-    fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), "utf8");
-  } catch (e) {
-    console.error("Error saving database locally:", e);
+    fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2), "utf8");
+  } catch (err) {
+    console.warn("saveLocalDB failed (read-only filesystem on Vercel).");
   }
 }
 
@@ -459,7 +462,6 @@ export async function fetchLogInspeksi(wilayah?: string): Promise<LogInspeksi[]>
 
 export async function authVerifyUser(usernameInput: string, passwordInput: string): Promise<{ success: boolean; wilayah?: string }> {
   const normUsername = usernameInput.toLowerCase().trim();
-  const db = getLocalDB();
   const hash = hashPassword(passwordInput);
 
   if (supabaseClient) {
@@ -479,6 +481,8 @@ export async function authVerifyUser(usernameInput: string, passwordInput: strin
     }
   }
 
+  // Fallback to local DB
+  const db = getLocalDB();
   const user = db.users ? db.users[normUsername] : null;
   if (!user) return { success: false };
 
