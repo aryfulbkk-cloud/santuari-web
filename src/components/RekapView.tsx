@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { FileText, Printer, FileWarning, Search, X, DownloadCloud } from "lucide-react";
+import { FileText, Printer, FileWarning, Search, X, DownloadCloud, Trash2 } from "lucide-react";
 import { LogInspeksi, DetailJawaban } from "../types";
 
 interface RekapViewProps {
@@ -10,6 +10,29 @@ interface RekapViewProps {
 export default function RekapView({ logs, onRefresh }: RekapViewProps) {
   const [search, setSearch] = useState("");
   const [selectedLog, setSelectedLog] = useState<LogInspeksi | null>(null);
+
+  const handleDelete = async (log: LogInspeksi) => {
+    if (confirm(`Apakah Anda yakin ingin menghapus arsip inspeksi untuk ${log.Nama_Tempat}?\nAksi ini tidak dapat dibatalkan.`)) {
+      try {
+        const token = localStorage.getItem("santuari_token") || "";
+        const res = await fetch(`/api/inspeksi/${log.Timestamp}`, {
+          method: 'DELETE',
+          headers: {
+            "Authorization": `Bearer ${token}`
+          }
+        });
+        const data = await res.json();
+        if (data.status === "success") {
+          alert("Arsip berhasil dihapus.");
+          onRefresh();
+        } else {
+          alert(`Gagal menghapus: ${data.message}`);
+        }
+      } catch (err) {
+        alert("Terjadi kesalahan jaringan saat menghapus arsip.");
+      }
+    }
+  };
 
   // Filter logs list
   const filteredLogs = logs.filter(log => {
@@ -126,13 +149,22 @@ export default function RekapView({ logs, onRefresh }: RekapViewProps) {
                         </span>
                       </td>
                       <td className="py-3.5 px-5 text-right">
-                        <button
-                          onClick={() => setSelectedLog(log)}
-                          className="text-[11px] font-medium text-gray-700 border border-gray-250 hover:bg-gray-50 shadow-sm bg-white px-3 py-1.5 rounded-lg inline-flex items-center gap-1.5 transition-all"
-                        >
-                          <FileText className="w-3.5 h-3.5 text-sky-600" />
-                          <span>Berita Acara</span>
-                        </button>
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => handleDelete(log)}
+                            title="Hapus Laporan"
+                            className="text-[11px] font-medium text-rose-600 border border-rose-200 hover:bg-rose-50 shadow-sm bg-white px-2.5 py-1.5 rounded-lg inline-flex items-center transition-all"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => setSelectedLog(log)}
+                            className="text-[11px] font-medium text-gray-700 border border-gray-250 hover:bg-gray-50 shadow-sm bg-white px-3 py-1.5 rounded-lg inline-flex items-center gap-1.5 transition-all"
+                          >
+                            <FileText className="w-3.5 h-3.5 text-sky-600" />
+                            <span>Berita Acara</span>
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
