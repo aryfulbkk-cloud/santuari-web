@@ -15,7 +15,9 @@ export default function RekapView({ logs, onRefresh }: RekapViewProps) {
     if (confirm(`Apakah Anda yakin ingin menghapus arsip inspeksi untuk ${log.Nama_Tempat}?\nAksi ini tidak dapat dibatalkan.`)) {
       try {
         const token = localStorage.getItem("santuari_token") || "";
-        const res = await fetch(`/api/inspeksi/${encodeURIComponent(log.Timestamp)}`, {
+        // Use Supabase id (primary key) if available, otherwise fall back to Timestamp
+        const deleteId = log.id ? String(log.id) : encodeURIComponent(log.Timestamp);
+        const res = await fetch(`/api/inspeksi/${deleteId}`, {
           method: 'DELETE',
           headers: {
             "Authorization": `Bearer ${token}`
@@ -27,7 +29,7 @@ export default function RekapView({ logs, onRefresh }: RekapViewProps) {
         if (contentType && contentType.includes("application/json")) {
           data = await res.json();
         } else {
-          throw new Error(`Server returned non-JSON response. Status: ${res.status}`);
+          throw new Error(`Server error. Status: ${res.status}`);
         }
 
         if (data.status === "success") {
@@ -38,7 +40,7 @@ export default function RekapView({ logs, onRefresh }: RekapViewProps) {
         }
       } catch (err: any) {
         console.error("Delete Error:", err);
-        alert(`Terjadi kesalahan jaringan saat menghapus arsip.\nInfo: ${err.message}`);
+        alert(`Terjadi kesalahan saat menghapus arsip.\nInfo: ${err.message}`);
       }
     }
   };
