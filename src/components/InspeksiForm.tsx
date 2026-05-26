@@ -469,12 +469,8 @@ export default function InspeksiForm({
 
     // Perform final skor calculations
     let totalDeductionsOrPoints = 0;
-    detailJawabanList.forEach((j) => {
-      // Find matching index key inside our answers state
-      const keyEntry = Object.entries(answers).find(([k, entry]) => (entry as any).item.No === j.no);
-      if (keyEntry) {
-        totalDeductionsOrPoints += (keyEntry[1] as any).value;
-      }
+    Object.values(answers).forEach((ansObj: any) => {
+      totalDeductionsOrPoints += ansObj.value || 0;
     });
 
     let skorAkhir = 0;
@@ -822,13 +818,13 @@ export default function InspeksiForm({
                         let vNo = 0;
 
                         if (isTFU) {
-                          const bobotVal = parseFloat(item.Bobot || "0");
-                          const maxVal = parseFloat(item.Nilai_Max || "1");
+                          const bobotVal = parseFloat((item.Bobot || "0").toString().replace(",", "."));
+                          const maxVal = parseFloat((item.Nilai_Max || "1").toString().replace(",", "."));
                           vYes = bobotVal * maxVal;
                           vNo = 0;
                         } else if (tK) {
                           vYes = 0;
-                          vNo = parseFloat(item[tK] || "0");
+                          vNo = parseFloat((item[tK] || "0").toString().replace(",", "."));
                         }
 
                         const uniqueKey = `k_${item.No}_${idx}`;
