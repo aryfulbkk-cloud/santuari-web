@@ -697,6 +697,28 @@ async function insertInspectionLog(payload) {
   }
   saveLocalDB(db);
 }
+async function deleteInspectionLog(timestamp) {
+  if (supabaseClient) {
+    try {
+      const { error } = await supabaseClient.from("log_inspeksi").delete().eq("Timestamp", timestamp);
+      if (!error) {
+        console.log("Supabase deleteInspectionLog succeeded.");
+      } else {
+        console.warn("Supabase deleteInspectionLog failed:", error);
+      }
+    } catch (e) {
+      console.error("Supabase error for log delete:", e);
+    }
+  }
+  const db = getLocalDB();
+  const originalLength = db.logs.length;
+  db.logs = db.logs.filter((l) => l.Timestamp !== timestamp);
+  if (db.logs.length < originalLength) {
+    saveLocalDB(db);
+    return true;
+  }
+  return false;
+}
 
 // server/kriteria_data.ts
 var kriteria_A1A2 = [
@@ -2047,6 +2069,19 @@ app.post("/api/inspeksi", authenticateToken, async (req, res) => {
     };
     await insertInspectionLog(inspection);
     res.json({ status: "success" });
+  } catch (err) {
+    res.status(500).json({ status: "error", message: err.toString() });
+  }
+});
+app.delete("/api/inspeksi/:timestamp", authenticateToken, async (req, res) => {
+  try {
+    const timestamp = req.params.timestamp;
+    const success = await deleteInspectionLog(timestamp);
+    if (success) {
+      res.json({ status: "success" });
+    } else {
+      res.status(404).json({ status: "error", message: "Data tidak ditemukan." });
+    }
   } catch (err) {
     res.status(500).json({ status: "error", message: err.toString() });
   }
