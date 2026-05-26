@@ -15,21 +15,30 @@ export default function RekapView({ logs, onRefresh }: RekapViewProps) {
     if (confirm(`Apakah Anda yakin ingin menghapus arsip inspeksi untuk ${log.Nama_Tempat}?\nAksi ini tidak dapat dibatalkan.`)) {
       try {
         const token = localStorage.getItem("santuari_token") || "";
-        const res = await fetch(`/api/inspeksi/${log.Timestamp}`, {
+        const res = await fetch(`/api/inspeksi/${encodeURIComponent(log.Timestamp)}`, {
           method: 'DELETE',
           headers: {
             "Authorization": `Bearer ${token}`
           }
         });
-        const data = await res.json();
+        
+        let data;
+        const contentType = res.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+          data = await res.json();
+        } else {
+          throw new Error(`Server returned non-JSON response. Status: ${res.status}`);
+        }
+
         if (data.status === "success") {
           alert("Arsip berhasil dihapus.");
           onRefresh();
         } else {
           alert(`Gagal menghapus: ${data.message}`);
         }
-      } catch (err) {
-        alert("Terjadi kesalahan jaringan saat menghapus arsip.");
+      } catch (err: any) {
+        console.error("Delete Error:", err);
+        alert(`Terjadi kesalahan jaringan saat menghapus arsip.\nInfo: ${err.message}`);
       }
     }
   };
