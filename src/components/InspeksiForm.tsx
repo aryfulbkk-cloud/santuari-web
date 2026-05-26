@@ -336,7 +336,6 @@ export default function InspeksiForm({
     !o.wilayah || 
     o.wilayah === "Semua Wilayah" || 
     o.wilayah === currentWilayah ||
-    currentWilayah === "Tembilahan Induk" || 
     currentWilayah === "Super Admin"
   );
 
