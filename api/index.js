@@ -698,11 +698,13 @@ async function insertInspectionLog(payload) {
   saveLocalDB(db);
 }
 async function deleteInspectionLog(timestamp) {
+  let supabaseSuccess = false;
   if (supabaseClient) {
     try {
       const { error } = await supabaseClient.from("log_inspeksi").delete().eq("Timestamp", timestamp);
       if (!error) {
         console.log("Supabase deleteInspectionLog succeeded.");
+        supabaseSuccess = true;
       } else {
         console.warn("Supabase deleteInspectionLog failed:", error);
       }
@@ -717,7 +719,7 @@ async function deleteInspectionLog(timestamp) {
     saveLocalDB(db);
     return true;
   }
-  return false;
+  return supabaseSuccess;
 }
 
 // server/kriteria_data.ts
