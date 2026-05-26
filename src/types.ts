@@ -35,6 +35,7 @@ export interface DetailJawaban {
 }
 
 export interface LogInspeksi {
+  id?: number; // Supabase serial primary key
   Timestamp: string;
   ID_Tempat: string;
   Nama_Tempat: string;
