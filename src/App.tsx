@@ -12,7 +12,7 @@ const RegistrasiForm = React.lazy(() => import("./components/RegistrasiForm"));
 const RekapView = React.lazy(() => import("./components/RekapView"));
 const LaporMasyarakat = React.lazy(() => import("./components/LaporMasyarakat"));
 const AuthOtorisasi = React.lazy(() => import("./components/AuthOtorisasi"));
-const SuperAdminReset = React.lazy(() => import("./components/SuperAdminReset"));
+const SuperAdminAccounts = React.lazy(() => import("./components/SuperAdminAccounts"));
 const SuperAdminPetugas = React.lazy(() =>
   import("./components/SuperAdminPetugas").then(m => ({ default: m.SuperAdminPetugas }))
 );
@@ -476,7 +476,7 @@ export default function App() {
             {isLoggedIn && activeView === "superadmin" && currentWilayah === "Super Admin" && (
               <div className="space-y-8 animate-in fade-in zoom-in duration-300">
                 <SuperAdminPetugas />
-                <SuperAdminReset />
+                <SuperAdminAccounts />
               </div>
             )}
 

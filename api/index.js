@@ -605,6 +605,165 @@ async function resetOfficerPassword(usernameTarget, newPasswordInput, operator) 
   saveLocalDB(db);
   return true;
 }
+async function fetchUserAccounts() {
+  if (supabaseClient) {
+    try {
+      const { data, error } = await supabaseClient.from("auth_users").select("username, wilayah, nama");
+      if (!error && data) {
+        return data.map((d) => ({
+          username: d.username,
+          wilayah: d.wilayah,
+          nama: d.nama || ""
+        }));
+      }
+      console.warn("Supabase fetchUserAccounts failed, falling back locally:", error);
+    } catch (e) {
+      console.error("Supabase fetchUserAccounts error:", e);
+    }
+  }
+  const db = getLocalDB();
+  const list = [];
+  if (db.users) {
+    for (const key in db.users) {
+      const u = db.users[key];
+      list.push({
+        username: u.username,
+        wilayah: u.wilayah,
+        nama: u.nama || ""
+      });
+    }
+  }
+  return list;
+}
+async function insertNewUserAccount(username, plainPass, wilayah, nama, operator = "Super Admin") {
+  const normUsername = username.toLowerCase().trim();
+  if (!normUsername || normUsername.length < 3 || /\s/.test(normUsername)) {
+    return { success: false, message: "Username tidak valid. Minimal 3 karakter dan tidak boleh mengandung spasi." };
+  }
+  const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[^a-zA-Z0-9]).{8,}$/;
+  if (!passwordRegex.test(plainPass)) {
+    return { success: false, message: "Password tidak memenuhi kriteria kompleksitas (Min 8 karakter, mengandung huruf besar, huruf kecil, dan minimal 1 simbol/karakter khusus)." };
+  }
+  const existingUsers = await fetchUserAccounts();
+  if (existingUsers.some((u) => u.username === normUsername)) {
+    return { success: false, message: `Username "${normUsername}" sudah terdaftar.` };
+  }
+  const hashedPass = hashPassword(plainPass);
+  if (supabaseClient) {
+    try {
+      const { error } = await supabaseClient.from("auth_users").insert({
+        username: normUsername,
+        password_hash: hashedPass,
+        wilayah,
+        nama
+      });
+      if (error) {
+        console.warn("Supabase insertNewUserAccount failed:", error);
+      }
+    } catch (e) {
+      console.error("Supabase insertNewUserAccount error:", e);
+    }
+  }
+  const db = getLocalDB();
+  if (!db.users) db.users = {};
+  db.users[normUsername] = {
+    username: normUsername,
+    passwordHash: hashedPass,
+    wilayah,
+    nama
+  };
+  if (!db.changeLogs) db.changeLogs = [];
+  db.changeLogs.push({
+    id: "CHG-" + Math.floor(1e3 + Math.random() * 9e3),
+    timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+    tipe: "TAMBAH",
+    idTempat: "SYSTEM-AUTH",
+    namaTempat: `Akun Baru: ${normUsername}`,
+    wilayah,
+    operator,
+    deskripsi: `Membuat akun baru "${normUsername}" (${nama}) untuk Wilayah Kerja ${wilayah}.`
+  });
+  saveLocalDB(db);
+  return { success: true, message: `Akun untuk petugas ${nama} (@${normUsername}) berhasil dibuat.` };
+}
+async function updateUserAccountByAdmin(usernameTarget, newNama, newWilayah, operator = "Super Admin") {
+  const normUsername = usernameTarget.toLowerCase().trim();
+  if (supabaseClient) {
+    try {
+      const { error } = await supabaseClient.from("auth_users").update({
+        nama: newNama,
+        wilayah: newWilayah
+      }).eq("username", normUsername);
+      if (error) {
+        console.warn("Supabase updateUserAccountByAdmin failed:", error);
+      }
+    } catch (e) {
+      console.error("Supabase updateUserAccountByAdmin error:", e);
+    }
+  }
+  const db = getLocalDB();
+  if (db.users && db.users[normUsername]) {
+    db.users[normUsername].nama = newNama;
+    db.users[normUsername].wilayah = newWilayah;
+  } else {
+    if (!db.users) db.users = {};
+    db.users[normUsername] = {
+      username: normUsername,
+      passwordHash: "",
+      // Placeholder
+      wilayah: newWilayah,
+      nama: newNama
+    };
+  }
+  if (!db.changeLogs) db.changeLogs = [];
+  db.changeLogs.push({
+    id: "CHG-" + Math.floor(1e3 + Math.random() * 9e3),
+    timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+    tipe: "UBAH",
+    idTempat: "SYSTEM-AUTH",
+    namaTempat: `Edit Akun: ${normUsername}`,
+    wilayah: newWilayah,
+    operator,
+    deskripsi: `Super Admin memperbarui profil akun "${normUsername}" -> Nama: ${newNama}, Wilayah: ${newWilayah}.`
+  });
+  saveLocalDB(db);
+  return { success: true, message: `Akun "${normUsername}" berhasil diperbarui.` };
+}
+async function deleteUserAccount(usernameTarget, operator = "Super Admin") {
+  const normUsername = usernameTarget.toLowerCase().trim();
+  if (normUsername === "superadmin") {
+    return { success: false, message: "Akun Super Admin utama tidak dapat dihapus." };
+  }
+  if (supabaseClient) {
+    try {
+      const { error } = await supabaseClient.from("auth_users").delete().eq("username", normUsername);
+      if (error) {
+        console.warn("Supabase deleteUserAccount failed:", error);
+      }
+    } catch (e) {
+      console.error("Supabase deleteUserAccount error:", e);
+    }
+  }
+  const db = getLocalDB();
+  let userWilayah = "";
+  if (db.users && db.users[normUsername]) {
+    userWilayah = db.users[normUsername].wilayah;
+    delete db.users[normUsername];
+  }
+  if (!db.changeLogs) db.changeLogs = [];
+  db.changeLogs.push({
+    id: "CHG-" + Math.floor(1e3 + Math.random() * 9e3),
+    timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+    tipe: "HAPUS",
+    idTempat: "SYSTEM-AUTH",
+    namaTempat: `Hapus Akun: ${normUsername}`,
+    wilayah: userWilayah || "Super Admin",
+    operator,
+    deskripsi: `Super Admin menghapus akun "${normUsername}".`
+  });
+  saveLocalDB(db);
+  return { success: true, message: `Akun "${normUsername}" berhasil dihapus.` };
+}
 async function insertNewPlace(place, operator = "Sistem") {
   const newId = place.ID_Tempat || "SNT-" + Math.floor(1e3 + Math.random() * 9e3);
   const enrichedPlace = { ...place, ID_Tempat: newId, Status_Aktif: place.Status_Aktif || "Aktif" };
@@ -2200,6 +2359,76 @@ app.post("/api/auth/reset-pin", authenticateToken, async (req, res) => {
       res.json({ status: "success", message: `Password untuk akun ${targetUsername} berhasil direset.` });
     } else {
       res.status(500).json({ status: "error", message: "Gagal mereset password." });
+    }
+  } catch (err) {
+    console.error("API Error:", err);
+    res.status(500).json({ status: "error", message: "Terjadi kesalahan internal server." });
+  }
+});
+app.get("/api/users", authenticateToken, async (req, res) => {
+  try {
+    if (req.userWilayah !== "Super Admin") {
+      return res.status(403).json({ status: "error", message: "Akses ditolak: Khusus Super Admin." });
+    }
+    const data = await fetchUserAccounts();
+    res.json({ status: "success", data });
+  } catch (err) {
+    console.error("API Error:", err);
+    res.status(500).json({ status: "error", message: "Terjadi kesalahan internal server." });
+  }
+});
+app.post("/api/users", authenticateToken, async (req, res) => {
+  try {
+    if (req.userWilayah !== "Super Admin") {
+      return res.status(403).json({ status: "error", message: "Akses ditolak: Khusus Super Admin." });
+    }
+    const { username, password, wilayah, nama } = req.body;
+    if (!username || !password || !wilayah || !nama) {
+      return res.status(400).json({ status: "error", message: "Username, Password, Wilayah, dan Nama wajib diisi." });
+    }
+    const result = await insertNewUserAccount(username, password, wilayah, nama, req.userName);
+    if (result.success) {
+      res.json({ status: "success", message: result.message });
+    } else {
+      res.status(400).json({ status: "error", message: result.message });
+    }
+  } catch (err) {
+    console.error("API Error:", err);
+    res.status(500).json({ status: "error", message: "Terjadi kesalahan internal server." });
+  }
+});
+app.put("/api/users/:username", authenticateToken, async (req, res) => {
+  try {
+    if (req.userWilayah !== "Super Admin") {
+      return res.status(403).json({ status: "error", message: "Akses ditolak: Khusus Super Admin." });
+    }
+    const { username } = req.params;
+    const { nama, wilayah } = req.body;
+    if (!nama || !wilayah) {
+      return res.status(400).json({ status: "error", message: "Nama dan Wilayah wajib diisi." });
+    }
+    const result = await updateUserAccountByAdmin(username, nama, wilayah, req.userName);
+    if (result.success) {
+      res.json({ status: "success", message: result.message });
+    } else {
+      res.status(400).json({ status: "error", message: result.message });
+    }
+  } catch (err) {
+    console.error("API Error:", err);
+    res.status(500).json({ status: "error", message: "Terjadi kesalahan internal server." });
+  }
+});
+app.delete("/api/users/:username", authenticateToken, async (req, res) => {
+  try {
+    if (req.userWilayah !== "Super Admin") {
+      return res.status(403).json({ status: "error", message: "Akses ditolak: Khusus Super Admin." });
+    }
+    const { username } = req.params;
+    const result = await deleteUserAccount(username, req.userName);
+    if (result.success) {
+      res.json({ status: "success", message: result.message });
+    } else {
+      res.status(400).json({ status: "error", message: result.message });
     }
   } catch (err) {
     console.error("API Error:", err);

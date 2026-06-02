@@ -21,7 +21,11 @@ import {
   deletePetugas,
   deleteInspectionLog,
   getUserProfile,
-  changeOwnPassword
+  changeOwnPassword,
+  fetchUserAccounts,
+  insertNewUserAccount,
+  updateUserAccountByAdmin,
+  deleteUserAccount
 } from "./server/db";
 import { kriteria_A1A2, kriteria_TFU } from "./server/kriteria_data";
 import { LogInspeksi, Tempat } from "./src/types";
@@ -312,6 +316,77 @@ async function configureApp() {
         res.json({ status: "success", message: `Password untuk akun ${targetUsername} berhasil direset.` });
       } else {
         res.status(500).json({ status: "error", message: "Gagal mereset password." });
+      }
+    } catch (err: any) {
+      res.status(500).json({ status: "error", message: err.toString() });
+    }
+  });
+
+  // 3d. Manage User Accounts (Super Admin only)
+  app.get("/api/users", authenticateToken, async (req: any, res) => {
+    try {
+      if (req.userWilayah !== "Super Admin") {
+        return res.status(403).json({ status: "error", message: "Akses ditolak: Khusus Super Admin." });
+      }
+      const data = await fetchUserAccounts();
+      res.json({ status: "success", data });
+    } catch (err: any) {
+      res.status(500).json({ status: "error", message: err.toString() });
+    }
+  });
+
+  app.post("/api/users", authenticateToken, async (req: any, res) => {
+    try {
+      if (req.userWilayah !== "Super Admin") {
+        return res.status(403).json({ status: "error", message: "Akses ditolak: Khusus Super Admin." });
+      }
+      const { username, password, wilayah, nama } = req.body;
+      if (!username || !password || !wilayah || !nama) {
+        return res.status(400).json({ status: "error", message: "Username, Password, Wilayah, dan Nama wajib diisi." });
+      }
+      const result = await insertNewUserAccount(username, password, wilayah, nama, req.userName);
+      if (result.success) {
+        res.json({ status: "success", message: result.message });
+      } else {
+        res.status(400).json({ status: "error", message: result.message });
+      }
+    } catch (err: any) {
+      res.status(500).json({ status: "error", message: err.toString() });
+    }
+  });
+
+  app.put("/api/users/:username", authenticateToken, async (req: any, res) => {
+    try {
+      if (req.userWilayah !== "Super Admin") {
+        return res.status(403).json({ status: "error", message: "Akses ditolak: Khusus Super Admin." });
+      }
+      const { username } = req.params;
+      const { nama, wilayah } = req.body;
+      if (!nama || !wilayah) {
+        return res.status(400).json({ status: "error", message: "Nama dan Wilayah wajib diisi." });
+      }
+      const result = await updateUserAccountByAdmin(username, nama, wilayah, req.userName);
+      if (result.success) {
+        res.json({ status: "success", message: result.message });
+      } else {
+        res.status(400).json({ status: "error", message: result.message });
+      }
+    } catch (err: any) {
+      res.status(500).json({ status: "error", message: err.toString() });
+    }
+  });
+
+  app.delete("/api/users/:username", authenticateToken, async (req: any, res) => {
+    try {
+      if (req.userWilayah !== "Super Admin") {
+        return res.status(403).json({ status: "error", message: "Akses ditolak: Khusus Super Admin." });
+      }
+      const { username } = req.params;
+      const result = await deleteUserAccount(username, req.userName);
+      if (result.success) {
+        res.json({ status: "success", message: result.message });
+      } else {
+        res.status(400).json({ status: "error", message: result.message });
       }
     } catch (err: any) {
       res.status(500).json({ status: "error", message: err.toString() });
