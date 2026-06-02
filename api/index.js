@@ -482,13 +482,27 @@ async function getUserProfile(username) {
   let nip = "-";
   let jabatan = "-";
   let petugasNama = "";
+  const findMatch = (petugasList, targetNama) => {
+    const target = targetNama.toLowerCase().trim();
+    return petugasList.find((p) => {
+      const pNama = (p.nama || "").toLowerCase().trim();
+      return pNama === target || pNama.includes(target) || target.includes(pNama);
+    });
+  };
   if (supabaseClient) {
     try {
-      const { data, error } = await supabaseClient.from("master_petugas").select("nip, jabatan, nama").eq("wilayah", userWilayah).limit(1);
+      const { data, error } = await supabaseClient.from("master_petugas").select("nip, jabatan, nama").eq("wilayah", userWilayah);
       if (!error && data && data.length > 0) {
-        nip = data[0].nip;
-        jabatan = data[0].jabatan;
-        petugasNama = data[0].nama || "";
+        const exactMatch = findMatch(data, userNama);
+        if (exactMatch) {
+          nip = exactMatch.nip;
+          jabatan = exactMatch.jabatan;
+          petugasNama = exactMatch.nama || "";
+        } else if (data.length === 1 && userNama.toLowerCase().trim().startsWith("petugas")) {
+          nip = data[0].nip;
+          jabatan = data[0].jabatan;
+          petugasNama = data[0].nama || "";
+        }
       }
     } catch (e) {
       console.error("Supabase getUserProfile petugas error:", e);
@@ -496,16 +510,24 @@ async function getUserProfile(username) {
   }
   if (nip === "-") {
     const db = getLocalDB();
-    const petugas = db.petugas.find((p) => p.wilayah === userWilayah);
-    if (petugas) {
-      nip = petugas.nip;
-      jabatan = petugas.jabatan;
-      petugasNama = petugas.nama || "";
+    const petugasList = db.petugas.filter((p) => p.wilayah === userWilayah);
+    if (petugasList.length > 0) {
+      const exactMatch = findMatch(petugasList, userNama);
+      if (exactMatch) {
+        nip = exactMatch.nip;
+        jabatan = exactMatch.jabatan;
+        petugasNama = exactMatch.nama || "";
+      } else if (petugasList.length === 1 && userNama.toLowerCase().trim().startsWith("petugas")) {
+        nip = petugasList[0].nip;
+        jabatan = petugasList[0].jabatan;
+        petugasNama = petugasList[0].nama || "";
+      }
     }
   }
+  const finalNama = petugasNama && petugasNama !== "" ? petugasNama : userNama || normUsername;
   return {
     username: normUsername,
-    nama: petugasNama || userNama,
+    nama: finalNama,
     wilayah: userWilayah,
     nip,
     jabatan

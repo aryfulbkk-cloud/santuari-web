@@ -568,17 +568,33 @@ export async function getUserProfile(username: string): Promise<{
   let jabatan = "-";
   let petugasNama = "";
 
+  const findMatch = (petugasList: any[], targetNama: string) => {
+    const target = targetNama.toLowerCase().trim();
+    return petugasList.find((p: any) => {
+      const pNama = (p.nama || "").toLowerCase().trim();
+      return pNama === target || pNama.includes(target) || target.includes(pNama);
+    });
+  };
+
   if (supabaseClient) {
     try {
       const { data, error } = await supabaseClient
         .from("master_petugas")
         .select("nip, jabatan, nama")
-        .eq("wilayah", userWilayah)
-        .limit(1);
+        .eq("wilayah", userWilayah);
+
       if (!error && data && data.length > 0) {
-        nip = data[0].nip;
-        jabatan = data[0].jabatan;
-        petugasNama = data[0].nama || "";
+        const exactMatch = findMatch(data, userNama);
+        if (exactMatch) {
+          nip = exactMatch.nip;
+          jabatan = exactMatch.jabatan;
+          petugasNama = exactMatch.nama || "";
+        } else if (data.length === 1 && userNama.toLowerCase().trim().startsWith("petugas")) {
+          // Hanya gunakan fallback jika akun login tersebut adalah akun default (legacy) yg diawali "Petugas ..."
+          nip = data[0].nip;
+          jabatan = data[0].jabatan;
+          petugasNama = data[0].nama || "";
+        }
       }
     } catch (e) {
       console.error("Supabase getUserProfile petugas error:", e);
@@ -587,17 +603,28 @@ export async function getUserProfile(username: string): Promise<{
 
   if (nip === "-") {
     const db = getLocalDB();
-    const petugas = db.petugas.find((p: Petugas) => p.wilayah === userWilayah);
-    if (petugas) {
-      nip = petugas.nip;
-      jabatan = petugas.jabatan;
-      petugasNama = petugas.nama || "";
+    const petugasList = db.petugas.filter((p: Petugas) => p.wilayah === userWilayah);
+    if (petugasList.length > 0) {
+      const exactMatch = findMatch(petugasList, userNama);
+      if (exactMatch) {
+        nip = exactMatch.nip;
+        jabatan = exactMatch.jabatan;
+        petugasNama = exactMatch.nama || "";
+      } else if (petugasList.length === 1 && userNama.toLowerCase().trim().startsWith("petugas")) {
+        nip = petugasList[0].nip;
+        jabatan = petugasList[0].jabatan;
+        petugasNama = petugasList[0].nama || "";
+      }
     }
   }
 
+  // Jika nama tidak sinkron antara auth_users dan master_petugas, 
+  // jangan overwrite nama login dengan nama orang lain!
+  const finalNama = (petugasNama && petugasNama !== "") ? petugasNama : (userNama || normUsername);
+
   return {
     username: normUsername,
-    nama: petugasNama || userNama,
+    nama: finalNama,
     wilayah: userWilayah,
     nip,
     jabatan
