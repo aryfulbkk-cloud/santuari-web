@@ -563,20 +563,22 @@ export async function getUserProfile(username: string): Promise<{
     userWilayah = user.wilayah;
   }
 
-  // Find matching petugas by wilayah for NIP and jabatan
+  // Find matching petugas by wilayah for NIP, jabatan, and name
   let nip = "-";
   let jabatan = "-";
+  let petugasNama = "";
 
   if (supabaseClient) {
     try {
       const { data, error } = await supabaseClient
         .from("master_petugas")
-        .select("nip, jabatan")
+        .select("nip, jabatan, nama")
         .eq("wilayah", userWilayah)
         .limit(1);
       if (!error && data && data.length > 0) {
         nip = data[0].nip;
         jabatan = data[0].jabatan;
+        petugasNama = data[0].nama || "";
       }
     } catch (e) {
       console.error("Supabase getUserProfile petugas error:", e);
@@ -589,12 +591,13 @@ export async function getUserProfile(username: string): Promise<{
     if (petugas) {
       nip = petugas.nip;
       jabatan = petugas.jabatan;
+      petugasNama = petugas.nama || "";
     }
   }
 
   return {
     username: normUsername,
-    nama: userNama,
+    nama: petugasNama || userNama,
     wilayah: userWilayah,
     nip,
     jabatan
@@ -727,6 +730,246 @@ export async function resetOfficerPassword(usernameTarget: string, newPasswordIn
 
   saveLocalDB(db);
   return true;
+}
+
+// Fetch all user accounts (excluding password hashes)
+export async function fetchUserAccounts(): Promise<{ username: string; wilayah: string; nama: string }[]> {
+  if (supabaseClient) {
+    try {
+      const { data, error } = await supabaseClient
+        .from("auth_users")
+        .select("username, wilayah, nama");
+      if (!error && data) {
+        return data.map((d: any) => ({
+          username: d.username,
+          wilayah: d.wilayah,
+          nama: d.nama || ""
+        }));
+      }
+      console.warn("Supabase fetchUserAccounts failed, falling back locally:", error);
+    } catch (e) {
+      console.error("Supabase fetchUserAccounts error:", e);
+    }
+  }
+
+  const db = getLocalDB();
+  const list: { username: string; wilayah: string; nama: string }[] = [];
+  if (db.users) {
+    for (const key in db.users) {
+      const u = db.users[key];
+      list.push({
+        username: u.username,
+        wilayah: u.wilayah,
+        nama: u.nama || ""
+      });
+    }
+  }
+  return list;
+}
+
+// Add new user account (Super Admin only)
+export async function insertNewUserAccount(
+  username: string,
+  plainPass: string,
+  wilayah: string,
+  nama: string,
+  operator: string = "Super Admin"
+): Promise<{ success: boolean; message: string }> {
+  const normUsername = username.toLowerCase().trim();
+
+  // Validate username syntax
+  if (!normUsername || normUsername.length < 3 || /\s/.test(normUsername)) {
+    return { success: false, message: "Username tidak valid. Minimal 3 karakter dan tidak boleh mengandung spasi." };
+  }
+
+  // Validate complexity
+  const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[^a-zA-Z0-9]).{8,}$/;
+  if (!passwordRegex.test(plainPass)) {
+    return { success: false, message: "Password tidak memenuhi kriteria kompleksitas (Min 8 karakter, mengandung huruf besar, huruf kecil, dan minimal 1 simbol/karakter khusus)." };
+  }
+
+  // Check if user already exists
+  const existingUsers = await fetchUserAccounts();
+  if (existingUsers.some(u => u.username === normUsername)) {
+    return { success: false, message: `Username "${normUsername}" sudah terdaftar.` };
+  }
+
+  const hashedPass = hashPassword(plainPass);
+
+  // 1. Save to Supabase
+  if (supabaseClient) {
+    try {
+      const { error } = await supabaseClient
+        .from("auth_users")
+        .insert({
+          username: normUsername,
+          password_hash: hashedPass,
+          wilayah,
+          nama
+        });
+      if (error) {
+        console.warn("Supabase insertNewUserAccount failed:", error);
+        return { success: false, message: "Database Error: " + error.message };
+      }
+    } catch (e: any) {
+      console.error("Supabase insertNewUserAccount error:", e);
+      return { success: false, message: "Network Error: " + e.message };
+    }
+  }
+
+  // 2. Save to Local DB
+  const db = getLocalDB();
+  if (!db.users) db.users = {};
+  db.users[normUsername] = {
+    username: normUsername,
+    passwordHash: hashedPass,
+    wilayah,
+    nama
+  };
+
+  // 3. Log System Action
+  if (!db.changeLogs) db.changeLogs = [];
+  db.changeLogs.push({
+    id: "CHG-" + Math.floor(1000 + Math.random() * 9000),
+    timestamp: new Date().toISOString(),
+    tipe: "TAMBAH",
+    idTempat: "SYSTEM-AUTH",
+    namaTempat: `Akun Baru: ${normUsername}`,
+    wilayah,
+    operator,
+    deskripsi: `Membuat akun baru "${normUsername}" (${nama}) untuk Wilayah Kerja ${wilayah}.`
+  });
+
+  saveLocalDB(db);
+  return { success: true, message: `Akun untuk petugas ${nama} (@${normUsername}) berhasil dibuat.` };
+}
+
+// Update user account (rename profile, username, and region)
+export async function updateUserAccountByAdmin(
+  usernameTarget: string,
+  newUsername: string,
+  newNama: string,
+  newWilayah: string,
+  operator: string = "Super Admin"
+): Promise<{ success: boolean; message: string }> {
+  const normOldUsername = usernameTarget.toLowerCase().trim();
+  const normNewUsername = newUsername.toLowerCase().trim();
+
+  // Validate new username syntax
+  if (!normNewUsername || normNewUsername.length < 3 || /\s/.test(normNewUsername)) {
+    return { success: false, message: "Username baru tidak valid. Minimal 3 karakter dan tanpa spasi." };
+  }
+
+  // 1. Update in Supabase
+  if (supabaseClient) {
+    try {
+      const { error } = await supabaseClient
+        .from("auth_users")
+        .update({
+          username: normNewUsername,
+          nama: newNama,
+          wilayah: newWilayah
+        })
+        .eq("username", normOldUsername);
+      if (error) {
+        console.warn("Supabase updateUserAccountByAdmin failed:", error);
+      }
+    } catch (e) {
+      console.error("Supabase updateUserAccountByAdmin error:", e);
+    }
+  }
+
+  // 2. Update Local DB
+  const db = getLocalDB();
+  if (db.users && db.users[normOldUsername]) {
+    const userToMove = db.users[normOldUsername];
+    userToMove.username = normNewUsername;
+    userToMove.nama = newNama;
+    userToMove.wilayah = newWilayah;
+    if (normOldUsername !== normNewUsername) {
+      db.users[normNewUsername] = userToMove;
+      delete db.users[normOldUsername];
+    }
+  } else {
+    // If not found in memory but updated, sync
+    if (!db.users) db.users = {};
+    db.users[normNewUsername] = {
+      username: normNewUsername,
+      passwordHash: "", // Placeholder
+      wilayah: newWilayah,
+      nama: newNama
+    };
+    if (normOldUsername !== normNewUsername) {
+      delete db.users[normOldUsername];
+    }
+  }
+
+  // 3. Log System Action
+  if (!db.changeLogs) db.changeLogs = [];
+  db.changeLogs.push({
+    id: "CHG-" + Math.floor(1000 + Math.random() * 9000),
+    timestamp: new Date().toISOString(),
+    tipe: "UBAH",
+    idTempat: "SYSTEM-AUTH",
+    namaTempat: `Edit Akun: ${normOldUsername}`,
+    wilayah: newWilayah,
+    operator,
+    deskripsi: `Super Admin memperbarui profil akun "${normOldUsername}" -> Username: ${normNewUsername}, Nama: ${newNama}, Wilayah: ${newWilayah}.`
+  });
+
+  saveLocalDB(db);
+  return { success: true, message: `Akun berhasil diperbarui.` };
+}
+
+// Delete user account
+export async function deleteUserAccount(
+  usernameTarget: string,
+  operator: string = "Super Admin"
+): Promise<{ success: boolean; message: string }> {
+  const normUsername = usernameTarget.toLowerCase().trim();
+
+  if (normUsername === "superadmin") {
+    return { success: false, message: "Akun Super Admin utama tidak dapat dihapus." };
+  }
+
+  // 1. Delete in Supabase
+  if (supabaseClient) {
+    try {
+      const { error } = await supabaseClient
+        .from("auth_users")
+        .delete()
+        .eq("username", normUsername);
+      if (error) {
+        console.warn("Supabase deleteUserAccount failed:", error);
+      }
+    } catch (e) {
+      console.error("Supabase deleteUserAccount error:", e);
+    }
+  }
+
+  // 2. Delete from Local DB
+  const db = getLocalDB();
+  let userWilayah = "";
+  if (db.users && db.users[normUsername]) {
+    userWilayah = db.users[normUsername].wilayah;
+    delete db.users[normUsername];
+  }
+
+  // 3. Log System Action
+  if (!db.changeLogs) db.changeLogs = [];
+  db.changeLogs.push({
+    id: "CHG-" + Math.floor(1000 + Math.random() * 9000),
+    timestamp: new Date().toISOString(),
+    tipe: "HAPUS",
+    idTempat: "SYSTEM-AUTH",
+    namaTempat: `Hapus Akun: ${normUsername}`,
+    wilayah: userWilayah || "Super Admin",
+    operator,
+    deskripsi: `Super Admin menghapus akun "${normUsername}".`
+  });
+
+  saveLocalDB(db);
+  return { success: true, message: `Akun "${normUsername}" berhasil dihapus.` };
 }
 
 export async function insertNewPlace(place: Tempat, operator: string = "Sistem"): Promise<string> {

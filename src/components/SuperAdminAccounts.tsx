@@ -27,6 +27,7 @@ export default function SuperAdminAccounts() {
 
   // Edit user state
   const [selectedUser, setSelectedUser] = useState<UserAccountData | null>(null);
+  const [editUsername, setEditUsername] = useState("");
   const [editNama, setEditNama] = useState("");
   const [editWilayah, setEditWilayah] = useState("");
 
@@ -151,6 +152,7 @@ export default function SuperAdminAccounts() {
           "Authorization": `Bearer ${token}`
         },
         body: JSON.stringify({
+          newUsername: editUsername.trim(),
           nama: editNama.trim(),
           wilayah: editWilayah
         })
@@ -243,6 +245,7 @@ export default function SuperAdminAccounts() {
 
   const openEditModal = (user: UserAccountData) => {
     setSelectedUser(user);
+    setEditUsername(user.username);
     setEditNama(user.nama);
     setEditWilayah(user.wilayah);
     setShowEditModal(true);
@@ -501,9 +504,21 @@ export default function SuperAdminAccounts() {
               <X className="w-5 h-5" />
             </button>
             <h3 className="font-black text-slate-800 text-base mb-1">Edit Profil Akun</h3>
-            <p className="text-xs text-slate-400 mb-5">Mengubah nama petugas dan penempatan wilayah kerja untuk akun @{selectedUser.username}</p>
+            <p className="text-xs text-slate-400 mb-5">Mengubah username, nama petugas, dan penempatan wilayah kerja untuk akun @{selectedUser.username}</p>
 
             <form onSubmit={handleUpdateUser} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">Rename Username</label>
+                <input
+                  type="text"
+                  required
+                  value={editUsername}
+                  onChange={e => setEditUsername(e.target.value.toLowerCase().replace(/\s/g, ""))}
+                  disabled={selectedUser.username === "superadmin"}
+                  className="w-full p-3 text-xs bg-slate-50 border border-slate-200 focus:border-sky-500 focus:bg-white rounded-xl outline-none font-semibold text-slate-700 disabled:opacity-50"
+                />
+              </div>
+
               <div className="space-y-1.5">
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">Rename Nama Petugas</label>
                 <input

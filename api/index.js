@@ -662,9 +662,11 @@ async function insertNewUserAccount(username, plainPass, wilayah, nama, operator
       });
       if (error) {
         console.warn("Supabase insertNewUserAccount failed:", error);
+        return { success: false, message: "Database Error: " + error.message };
       }
     } catch (e) {
       console.error("Supabase insertNewUserAccount error:", e);
+      return { success: false, message: "Network Error: " + e.message };
     }
   }
   const db = getLocalDB();
@@ -2420,8 +2422,12 @@ app.put("/api/users/:username", authenticateToken, async (req, res) => {
       return res.status(403).json({ status: "error", message: "Akses ditolak: Khusus Super Admin." });
     }
     const { username } = req.params;
-    const { newUsername, nama, wilayah } = req.body;
-    if (!newUsername || !nama || !wilayah) {
+    const { nama, wilayah } = req.body;
+    let { newUsername } = req.body;
+    if (!newUsername) {
+      newUsername = username;
+    }
+    if (!nama || !wilayah) {
       return res.status(400).json({ status: "error", message: "Username, Nama, dan Wilayah wajib diisi." });
     }
     const result = await updateUserAccountByAdmin(username, newUsername, nama, wilayah, req.userName);
