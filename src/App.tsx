@@ -111,6 +111,21 @@ export default function App() {
       if (dataPetugas.status === "success") {
         setOfficers(dataPetugas.data);
       }
+
+      // 4. Fetch profile to sync user name and region updates in real-time
+      const token = localStorage.getItem("santuari_token");
+      if (token) {
+        const resProf = await fetch("/api/profile", {
+          headers: { "Authorization": `Bearer ${token}` }
+        });
+        const dataProf = await resProf.json();
+        if (dataProf.status === "success") {
+          setUserNama(dataProf.data.nama);
+          localStorage.setItem("santuari_nama", dataProf.data.nama);
+          setCurrentWilayah(dataProf.data.wilayah);
+          localStorage.setItem("santuari_wilayah", dataProf.data.wilayah);
+        }
+      }
     } catch (err) {
       console.error("Error synchronizing data with Server:", err);
     } finally {
@@ -475,7 +490,7 @@ export default function App() {
 
             {isLoggedIn && activeView === "superadmin" && currentWilayah === "Super Admin" && (
               <div className="space-y-8 animate-in fade-in zoom-in duration-300">
-                <SuperAdminPetugas />
+                <SuperAdminPetugas onUpdate={synchAllData} />
                 <SuperAdminAccounts />
               </div>
             )}

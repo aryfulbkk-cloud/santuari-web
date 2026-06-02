@@ -2,7 +2,11 @@ import React, { useState, useEffect } from "react";
 import { Users, UserPlus, Edit2, Trash2, Shield, MapPin, X, CheckCircle, AlertTriangle } from "lucide-react";
 import { Petugas } from "../types";
 
-export function SuperAdminPetugas() {
+interface SuperAdminPetugasProps {
+  onUpdate?: () => void;
+}
+
+export function SuperAdminPetugas({ onUpdate }: SuperAdminPetugasProps) {
   const [officers, setOfficers] = useState<Petugas[]>([]);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
@@ -63,6 +67,7 @@ export function SuperAdminPetugas() {
         setSuccessMsg(isEditing ? "Petugas berhasil diperbarui." : "Petugas baru berhasil ditambahkan.");
         setShowForm(false);
         fetchOfficers();
+        if (onUpdate) onUpdate();
       } else {
         setErrorMsg(data.message || "Gagal menyimpan petugas");
       }
@@ -93,6 +98,7 @@ export function SuperAdminPetugas() {
       if (res.ok && data.status === "success") {
         setSuccessMsg("Petugas berhasil dihapus.");
         fetchOfficers();
+        if (onUpdate) onUpdate();
       } else {
         setErrorMsg(data.message || "Gagal menghapus petugas");
       }

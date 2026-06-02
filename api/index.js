@@ -481,12 +481,14 @@ async function getUserProfile(username) {
   }
   let nip = "-";
   let jabatan = "-";
+  let petugasNama = "";
   if (supabaseClient) {
     try {
-      const { data, error } = await supabaseClient.from("master_petugas").select("nip, jabatan").eq("wilayah", userWilayah).limit(1);
+      const { data, error } = await supabaseClient.from("master_petugas").select("nip, jabatan, nama").eq("wilayah", userWilayah).limit(1);
       if (!error && data && data.length > 0) {
         nip = data[0].nip;
         jabatan = data[0].jabatan;
+        petugasNama = data[0].nama || "";
       }
     } catch (e) {
       console.error("Supabase getUserProfile petugas error:", e);
@@ -498,11 +500,12 @@ async function getUserProfile(username) {
     if (petugas) {
       nip = petugas.nip;
       jabatan = petugas.jabatan;
+      petugasNama = petugas.nama || "";
     }
   }
   return {
     username: normUsername,
-    nama: userNama,
+    nama: petugasNama || userNama,
     wilayah: userWilayah,
     nip,
     jabatan
