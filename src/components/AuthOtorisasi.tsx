@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { ShieldAlert, LogIn, X, Loader2 } from "lucide-react";
 
 interface AuthOtorisasiProps {
-  onLoginSuccess: (wilayah: string, token: string) => void;
+  onLoginSuccess: (wilayah: string, token: string, username?: string, nama?: string) => void;
   onCancel: () => void;
 }
 
@@ -35,7 +35,7 @@ export default function AuthOtorisasi({ onLoginSuccess, onCancel }: AuthOtorisas
 
       const res = await response.json();
       if (res.status === "success") {
-        onLoginSuccess(res.wilayah, res.token);
+        onLoginSuccess(res.wilayah, res.token, res.username, res.nama);
       } else {
         setErrorText(res.message || "Kredensial yang dimasukkan salah!");
       }

@@ -12,7 +12,10 @@ import {
   fetchChangeLogs,
   resetOfficerPassword,
   savePetugas,
-  deletePetugas
+  deletePetugas,
+  deleteInspectionLog,
+  getUserProfile,
+  changeOwnPassword
 } from "../server/db";
 import { kriteria_A1A2, kriteria_TFU } from "../server/kriteria_data";
 import { LogInspeksi, Tempat } from "../src/types";
@@ -25,8 +28,81 @@ const app = express();
 app.use(express.json({ limit: "15mb" }));
 app.use(express.urlencoded({ extended: true, limit: "15mb" }));
 
-// In-memory token storage (per-instance on Vercel)
-const ACTIVE_TOKENS = new Map<string, { wilayah: string; expires: number }>();
+// Security Headers
+app.use((req: any, res: any, next: any) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  next();
+});
+
+// CORS Middleware
+app.use((req: any, res: any, next: any) => {
+  const allowedOrigins = [
+    'https://santuaribkktbh.web.id',
+    'http://localhost:5173',
+    'http://localhost:3000'
+  ];
+  const origin = req.headers.origin;
+  if (origin && allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  if (req.method === 'OPTIONS') {
+    return res.status(204).end();
+  }
+  next();
+});
+
+// Simple rate limiting for auth endpoints
+const loginAttempts = new Map<string, { count: number; resetTime: number }>();
+const RATE_LIMIT_WINDOW = 15 * 60 * 1000; // 15 minutes
+const RATE_LIMIT_MAX = 10; // max 10 attempts per window
+
+function checkRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const record = loginAttempts.get(ip);
+  if (!record || now > record.resetTime) {
+    loginAttempts.set(ip, { count: 1, resetTime: now + RATE_LIMIT_WINDOW });
+    return true;
+  }
+  if (record.count >= RATE_LIMIT_MAX) return false;
+  record.count++;
+  return true;
+}
+
+// HMAC-based self-verifying token (works across serverless instances)
+const TOKEN_SECRET = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || "santuari_fallback_secret_2026";
+
+function generateSignedToken(wilayah: string, username: string): string {
+  const payload = JSON.stringify({
+    wilayah,
+    username,
+    exp: Date.now() + 24 * 60 * 60 * 1000 // 24 hours
+  });
+  const payloadB64 = Buffer.from(payload).toString("base64url");
+  const signature = crypto.createHmac("sha256", TOKEN_SECRET).update(payloadB64).digest("base64url");
+  return `${payloadB64}.${signature}`;
+}
+
+function verifySignedToken(token: string): { wilayah: string; username: string; exp: number } | null {
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 2) return null;
+    const [payloadB64, signature] = parts;
+    const expectedSig = crypto.createHmac("sha256", TOKEN_SECRET).update(payloadB64).digest("base64url");
+    if (signature !== expectedSig) return null;
+    const payload = JSON.parse(Buffer.from(payloadB64, "base64url").toString());
+    if (Date.now() > payload.exp) return null;
+    return payload;
+  } catch {
+    return null;
+  }
+}
 
 // XSS Sanitizer
 function sanitizeString(str: any): string {
@@ -48,18 +124,13 @@ function authenticateToken(req: any, res: any, next: any) {
     return res.status(401).json({ status: "error", message: "Token otentikasi diperlukan." });
   }
 
-  const session = ACTIVE_TOKENS.get(token);
+  const session = verifySignedToken(token);
   if (!session) {
     return res.status(403).json({ status: "error", message: "Sesi tidak valid atau telah kedalwarsa." });
   }
 
-  if (Date.now() > session.expires) {
-    ACTIVE_TOKENS.delete(token);
-    return res.status(403).json({ status: "error", message: "Sesi Anda telah kedaluwarsa. Silakan login kembali." });
-  }
-
-  session.expires = Date.now() + 3 * 60 * 60 * 1000;
   req.userWilayah = session.wilayah;
+  req.userName = session.username || "";
   req.token = token;
   next();
 }
@@ -74,7 +145,8 @@ app.get("/api/petugas", async (req, res) => {
     const data = await fetchPetugasList();
     res.json({ status: "success", data });
   } catch (err: any) {
-    res.status(500).json({ status: "error", message: err.toString() });
+    console.error("API Error:", err);
+    res.status(500).json({ status: "error", message: "Terjadi kesalahan internal server." });
   }
 });
 
@@ -97,7 +169,8 @@ app.post("/api/petugas", authenticateToken, async (req: any, res: any) => {
       res.status(500).json({ status: "error", message: "Gagal menyimpan petugas" });
     }
   } catch (err: any) {
-    res.status(500).json({ status: "error", message: err.toString() });
+    console.error("API Error:", err);
+    res.status(500).json({ status: "error", message: "Terjadi kesalahan internal server." });
   }
 });
 
@@ -115,7 +188,8 @@ app.delete("/api/petugas/:nip", authenticateToken, async (req: any, res: any) =>
       res.status(404).json({ status: "error", message: "Petugas tidak ditemukan" });
     }
   } catch (err: any) {
-    res.status(500).json({ status: "error", message: err.toString() });
+    console.error("API Error:", err);
+    res.status(500).json({ status: "error", message: "Terjadi kesalahan internal server." });
   }
 });
 
@@ -125,13 +199,22 @@ app.get("/api/dashboard", async (req, res) => {
     const places = await fetchPlaces();
     res.json({ status: "success", data: places });
   } catch (err: any) {
-    res.status(500).json({ status: "error", message: err.toString() });
+    console.error("API Error:", err);
+    res.status(500).json({ status: "error", message: "Terjadi kesalahan internal server." });
   }
 });
 
 // 3. Verify Username and Password
 app.post("/api/auth/verify", async (req, res) => {
   try {
+    const clientIp = req.headers['x-forwarded-for'] || req.ip || 'unknown';
+    if (!checkRateLimit(typeof clientIp === 'string' ? clientIp : clientIp[0])) {
+      return res.status(429).json({ 
+        status: "error", 
+        message: "Terlalu banyak percobaan login. Silakan coba lagi dalam 15 menit." 
+      });
+    }
+
     const { username, password } = req.body;
     if (!username || !password) {
       return res.status(400).json({ status: "error", message: "Username dan Password wajib diisi." });
@@ -140,24 +223,56 @@ app.post("/api/auth/verify", async (req, res) => {
     const result = await authVerifyUser(username, password);
 
     if (result.success && result.wilayah) {
-      const token = crypto.randomBytes(16).toString("hex");
-
-      ACTIVE_TOKENS.set(token, {
-        wilayah: result.wilayah,
-        expires: Date.now() + 3 * 60 * 60 * 1000
-      });
+      const token = generateSignedToken(result.wilayah, result.username || username);
 
       res.json({
         status: "success",
         message: "Akses Diberikan",
         token,
-        wilayah: result.wilayah
+        wilayah: result.wilayah,
+        username: result.username || username,
+        nama: result.nama || username
       });
     } else {
       res.status(401).json({ status: "error", message: "Kredensial Tidak Valid." });
     }
   } catch (err: any) {
-    res.status(500).json({ status: "error", message: err.toString() });
+    console.error("API Error:", err);
+    res.status(500).json({ status: "error", message: "Terjadi kesalahan internal server." });
+  }
+});
+
+// 3b. Get User Profile
+app.get("/api/profile", authenticateToken, async (req: any, res) => {
+  try {
+    const profile = await getUserProfile(req.userName);
+    if (profile) {
+      res.json({ status: "success", data: profile });
+    } else {
+      res.status(404).json({ status: "error", message: "Profil user tidak ditemukan." });
+    }
+  } catch (err: any) {
+    console.error("API Error:", err);
+    res.status(500).json({ status: "error", message: "Terjadi kesalahan internal server." });
+  }
+});
+
+// 3c. Change Own Password
+app.post("/api/profile/change-password", authenticateToken, async (req: any, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ status: "error", message: "Password saat ini dan password baru wajib diisi." });
+    }
+    const result = await changeOwnPassword(req.userName, currentPassword, newPassword);
+    if (result.success) {
+      res.json({ status: "success", message: result.message });
+    } else {
+      res.status(400).json({ status: "error", message: result.message });
+    }
+  } catch (err: any) {
+    console.error("API Error:", err);
+    res.status(500).json({ status: "error", message: "Terjadi kesalahan internal server." });
   }
 });
 
@@ -169,7 +284,8 @@ app.get("/api/kriteria", (req, res) => {
     const data = typeStr.startsWith("TPP") ? kriteria_A1A2 : kriteria_TFU;
     res.json({ status: "success", data });
   } catch (err: any) {
-    res.status(500).json({ status: "error", message: err.toString() });
+    console.error("API Error:", err);
+    res.status(500).json({ status: "error", message: "Terjadi kesalahan internal server." });
   }
 });
 
@@ -186,7 +302,8 @@ app.get("/api/places/list", async (req, res) => {
 
     res.json({ status: "success", data: filtered });
   } catch (err: any) {
-    res.status(500).json({ status: "error", message: err.toString() });
+    console.error("API Error:", err);
+    res.status(500).json({ status: "error", message: "Terjadi kesalahan internal server." });
   }
 });
 
@@ -230,7 +347,8 @@ app.get("/api/rekap", async (req, res) => {
 
     res.json({ status: "success", data: processedLogs });
   } catch (err: any) {
-    res.status(500).json({ status: "error", message: err.toString() });
+    console.error("API Error:", err);
+    res.status(500).json({ status: "error", message: "Terjadi kesalahan internal server." });
   }
 });
 
@@ -261,7 +379,8 @@ app.post("/api/auth/reset-pin", authenticateToken, async (req: any, res) => {
       res.status(500).json({ status: "error", message: "Gagal mereset password." });
     }
   } catch (err: any) {
-    res.status(500).json({ status: "error", message: err.toString() });
+    console.error("API Error:", err);
+    res.status(500).json({ status: "error", message: "Terjadi kesalahan internal server." });
   }
 });
 
@@ -298,7 +417,8 @@ app.post("/api/tempat", authenticateToken, async (req: any, res) => {
     const resultId = await insertNewPlace(newPlace, operator);
     res.json({ status: "success", newId: resultId });
   } catch (err: any) {
-    res.status(500).json({ status: "error", message: err.toString() });
+    console.error("API Error:", err);
+    res.status(500).json({ status: "error", message: "Terjadi kesalahan internal server." });
   }
 });
 
@@ -339,7 +459,8 @@ app.post("/api/tempat/update", authenticateToken, async (req: any, res) => {
       res.status(404).json({ status: "error", message: "Tempat tidak ditemukan." });
     }
   } catch (err: any) {
-    res.status(500).json({ status: "error", message: err.toString() });
+    console.error("API Error:", err);
+    res.status(500).json({ status: "error", message: "Terjadi kesalahan internal server." });
   }
 });
 
@@ -359,7 +480,8 @@ app.post("/api/tempat/delete", authenticateToken, async (req: any, res) => {
       res.status(404).json({ status: "error", message: "Tempat tidak ditemukan." });
     }
   } catch (err: any) {
-    res.status(500).json({ status: "error", message: err.toString() });
+    console.error("API Error:", err);
+    res.status(500).json({ status: "error", message: "Terjadi kesalahan internal server." });
   }
 });
 
@@ -369,7 +491,8 @@ app.get("/api/changelogs", authenticateToken, async (req, res) => {
     const data = await fetchChangeLogs();
     res.json({ status: "success", data });
   } catch (err: any) {
-    res.status(500).json({ status: "error", message: err.toString() });
+    console.error("API Error:", err);
+    res.status(500).json({ status: "error", message: "Terjadi kesalahan internal server." });
   }
 });
 
@@ -413,11 +536,35 @@ app.post("/api/inspeksi", authenticateToken, async (req: any, res) => {
     await insertInspectionLog(inspection);
     res.json({ status: "success" });
   } catch (err: any) {
-    res.status(500).json({ status: "error", message: err.toString() });
+    console.error("API Error:", err);
+    res.status(500).json({ status: "error", message: "Terjadi kesalahan internal server." });
+  }
+});
+
+// Delete inspection log (by Supabase id or Timestamp)
+app.delete("/api/inspeksi/:identifier", authenticateToken, async (req: any, res) => {
+  try {
+    const identifier = decodeURIComponent(req.params.identifier);
+    console.log("DELETE /api/inspeksi called with identifier:", identifier);
+    const success = await deleteInspectionLog(identifier);
+    if (success) {
+      res.json({ status: "success" });
+    } else {
+      res.status(404).json({ status: "error", message: "Data tidak ditemukan di database." });
+    }
+  } catch (err: any) {
+    console.error("DELETE /api/inspeksi error:", err);
+    res.status(500).json({ status: "error", message: "Terjadi kesalahan internal server." });
   }
 });
 
 // ==========================================
 // EXPORT FOR VERCEL
 // ==========================================
+// Centralized Error Handler
+app.use((err: any, req: any, res: any, next: any) => {
+  console.error("Unhandled Error:", err);
+  res.status(500).json({ status: "error", message: "Terjadi kesalahan internal server." });
+});
+
 export default app;

@@ -1,22 +1,27 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense, useCallback } from "react";
 import { 
   LayoutDashboard, ShieldCheck, ClipboardCheck, MapPin, 
-  FolderCheck, LogOut, ShieldAlert, Heart, Menu, Loader2 
+  FolderCheck, LogOut, ShieldAlert, Heart, Menu, Loader2, UserCircle 
 } from "lucide-react";
 
-import HomeDashboard from "./components/HomeDashboard";
-import InspeksiForm from "./components/InspeksiForm";
-import RegistrasiForm from "./components/RegistrasiForm";
-import RekapView from "./components/RekapView";
-import LaporMasyarakat from "./components/LaporMasyarakat";
-import AuthOtorisasi from "./components/AuthOtorisasi";
-import SuperAdminReset from "./components/SuperAdminReset";
-import { SuperAdminPetugas } from "./components/SuperAdminPetugas";
+import LoadingSkeleton from "./components/LoadingSkeleton";
+
+const HomeDashboard = React.lazy(() => import("./components/HomeDashboard"));
+const InspeksiForm = React.lazy(() => import("./components/InspeksiForm"));
+const RegistrasiForm = React.lazy(() => import("./components/RegistrasiForm"));
+const RekapView = React.lazy(() => import("./components/RekapView"));
+const LaporMasyarakat = React.lazy(() => import("./components/LaporMasyarakat"));
+const AuthOtorisasi = React.lazy(() => import("./components/AuthOtorisasi"));
+const SuperAdminReset = React.lazy(() => import("./components/SuperAdminReset"));
+const SuperAdminPetugas = React.lazy(() =>
+  import("./components/SuperAdminPetugas").then(m => ({ default: m.SuperAdminPetugas }))
+);
+const UserProfile = React.lazy(() => import("./components/UserProfile"));
 import { ErrorBoundary } from "./ErrorBoundary";
 import { Tempat, LogInspeksi, Petugas } from "./types";
 
 export default function App() {
-  const [activeView, setActiveView] = useState<"dashboard" | "inspeksi" | "registrasi" | "rekap" | "superadmin">("dashboard");
+  const [activeView, setActiveView] = useState<"dashboard" | "inspeksi" | "registrasi" | "rekap" | "superadmin" | "profile">("dashboard");
   
   // Lazy init auth states with 3-hour local check
   const [isLoggedIn, setIsLoggedIn] = useState(() => {
@@ -49,6 +54,14 @@ export default function App() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [dashboardWilayah, setDashboardWilayah] = useState("Semua Wilayah");
+  const [userName, setUserName] = useState(() => {
+    if (typeof window === "undefined") return "";
+    return localStorage.getItem("santuari_username") || "";
+  });
+  const [userNama, setUserNama] = useState(() => {
+    if (typeof window === "undefined") return "";
+    return localStorage.getItem("santuari_nama") || "";
+  });
 
   // Keep dashboardWilayah in sync with active officer's Wilker access limit
   useEffect(() => {
@@ -75,7 +88,7 @@ export default function App() {
   };
 
   // Synchronize data from Express server
-  const synchAllData = async () => {
+  const synchAllData = useCallback(async () => {
     setLoading(true);
     try {
       // 1. Fetch places
@@ -103,7 +116,7 @@ export default function App() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   // Interaction timer update to capture absolute active workflow usage and logs
   useEffect(() => {
@@ -143,13 +156,17 @@ export default function App() {
     synchAllData();
   }, []);
 
-  const handleLoginSuccess = (wilayah: string, token: string) => {
+  const handleLoginSuccess = useCallback((wilayah: string, token: string, usernameRes?: string, namaRes?: string) => {
     setIsLoggedIn(true);
     setCurrentWilayah(wilayah);
+    setUserName(usernameRes || "");
+    setUserNama(namaRes || "");
     localStorage.setItem("santuari_logged_in", "true");
     localStorage.setItem("santuari_wilayah", wilayah);
     localStorage.setItem("santuari_token", token);
     localStorage.setItem("santuari_last_active", Date.now().toString());
+    if (usernameRes) localStorage.setItem("santuari_username", usernameRes);
+    if (namaRes) localStorage.setItem("santuari_nama", namaRes);
     setShowAuthModal(false);
     // If Super Admin, automatically navigate to settings, otherwise dashboard
     if (wilayah === "Super Admin") {
@@ -157,17 +174,21 @@ export default function App() {
     } else {
       setActiveView("dashboard");
     }
-  };
+  }, []);
 
-  const handleLogout = () => {
+  const handleLogout = useCallback(() => {
     setIsLoggedIn(false);
     setCurrentWilayah("");
+    setUserName("");
+    setUserNama("");
     localStorage.removeItem("santuari_logged_in");
     localStorage.removeItem("santuari_wilayah");
     localStorage.removeItem("santuari_token");
     localStorage.removeItem("santuari_last_active");
+    localStorage.removeItem("santuari_username");
+    localStorage.removeItem("santuari_nama");
     setActiveView("dashboard");
-  };
+  }, []);
 
   return (
     <div className="flex w-screen h-screen overflow-hidden bg-gray-50 font-sans leading-normal text-gray-900 pr-sub-print">
@@ -299,6 +320,21 @@ export default function App() {
                     <FolderCheck className="w-4 h-4" />
                     <span>Rekap Hasil Inspeksi</span>
                   </button>
+
+                  <button
+                    onClick={() => {
+                      setActiveView("profile");
+                      setMobileSidebarOpen(false);
+                    }}
+                    className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg font-medium text-xs leading-none transition-all ${
+                      activeView === "profile"
+                        ? "bg-sky-50 text-sky-700 font-semibold"
+                        : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                    }`}
+                  >
+                    <UserCircle className="w-4 h-4" />
+                    <span>Profil Saya</span>
+                  </button>
                 </>
               )}
 
@@ -381,6 +417,7 @@ export default function App() {
         ) : (
           /* Actual Content views */
           <div className="flex-1 print:block">
+            <Suspense fallback={<LoadingSkeleton variant={activeView === "rekap" ? "table" : activeView === "inspeksi" || activeView === "registrasi" ? "form" : "chart"} />}>
             {activeView === "dashboard" && (
               <HomeDashboard 
                 places={places} 
@@ -442,18 +479,31 @@ export default function App() {
                 <SuperAdminReset />
               </div>
             )}
+
+            {isLoggedIn && activeView === "profile" && (
+              <UserProfile
+                username={userName}
+                userNama={userNama}
+                currentWilayah={currentWilayah}
+              />
+            )}
+            </Suspense>
           </div>
         )}
 
         {/* Floating whatsapp messenger */}
-        <LaporMasyarakat />
+        <Suspense fallback={null}>
+          <LaporMasyarakat />
+        </Suspense>
 
         {/* Auth Entry PIN Modal overlay */}
         {showAuthModal && (
-          <AuthOtorisasi 
-            onLoginSuccess={handleLoginSuccess}
-            onCancel={() => setShowAuthModal(false)}
-          />
+          <Suspense fallback={null}>
+            <AuthOtorisasi 
+              onLoginSuccess={handleLoginSuccess}
+              onCancel={() => setShowAuthModal(false)}
+            />
+          </Suspense>
         )}
       </main>
     </div>

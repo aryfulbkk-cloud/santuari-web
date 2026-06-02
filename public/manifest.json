@@ -1,0 +1,26 @@
+{
+  "name": "SANTUARI - Balai Kekarantinaan Kesehatan Tembilahan",
+  "short_name": "SANTUARI",
+  "description": "Sistem Pemantauan dan Inspeksi IKL (Kesehatan Lingkungan) untuk TPP dan TFU di wilayah kerja BKK Tembilahan.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "theme_color": "#0284c7",
+  "background_color": "#f8fafc",
+  "categories": ["government", "health", "productivity"],
+  "lang": "id",
+  "icons": [
+    {
+      "src": "https://kespelcilacap.com/wp-content/uploads/2025/10/Logo-BKK.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://kespelcilacap.com/wp-content/uploads/2025/10/Logo-BKK.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

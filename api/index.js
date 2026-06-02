@@ -41,13 +41,13 @@ var DEFAULT_AUTH_PINS = {
   "Super Admin": "999999"
 };
 var DEFAULT_AUTH_USERS = {
-  "superadmin": { username: "superadmin", plainPass: "Super@Admin123", wilayah: "Super Admin" },
-  "tembilahan": { username: "tembilahan", plainPass: "Tembilahan@2026", wilayah: "Tembilahan Induk" },
-  "kualagaung": { username: "kualagaung", plainPass: "Kuala@Gaung2026", wilayah: "Kuala Gaung" },
-  "sungaiguntung": { username: "sungaiguntung", plainPass: "Sungai@Guntung2026", wilayah: "Sungai Guntung" },
-  "kualaenok": { username: "kualaenok", plainPass: "Kuala@Enok2026", wilayah: "Kuala Enok" },
-  "pulaukijang": { username: "pulaukijang", plainPass: "Pulau@Kijang2026", wilayah: "Pulau Kijang" },
-  "rengat": { username: "rengat", plainPass: "Rengat@2026", wilayah: "Rengat" }
+  "superadmin": { username: "superadmin", plainPass: "Super@Admin123", wilayah: "Super Admin", nama: "Administrator" },
+  "tembilahan": { username: "tembilahan", plainPass: "Tembilahan@2026", wilayah: "Tembilahan Induk", nama: "Petugas Tembilahan" },
+  "kualagaung": { username: "kualagaung", plainPass: "Kuala@Gaung2026", wilayah: "Kuala Gaung", nama: "Petugas Kuala Gaung" },
+  "sungaiguntung": { username: "sungaiguntung", plainPass: "Sungai@Guntung2026", wilayah: "Sungai Guntung", nama: "Petugas Sungai Guntung" },
+  "kualaenok": { username: "kualaenok", plainPass: "Kuala@Enok2026", wilayah: "Kuala Enok", nama: "Petugas Kuala Enok" },
+  "pulaukijang": { username: "pulaukijang", plainPass: "Pulau@Kijang2026", wilayah: "Pulau Kijang", nama: "Petugas Pulau Kijang" },
+  "rengat": { username: "rengat", plainPass: "Rengat@2026", wilayah: "Rengat", nama: "Petugas Rengat" }
 };
 var DEFAULT_PETUGAS = [
   { nama: "H. Irwan Efendi, S.KM., M.Si", nip: "197810142002121001", jabatan: "Inspektur Kesling Madya" },
@@ -199,7 +199,8 @@ function getLocalDB() {
         initialUsers[key] = {
           username: u.username,
           passwordHash: hashPassword(u.plainPass),
-          wilayah: u.wilayah
+          wilayah: u.wilayah,
+          nama: u.nama
         };
       }
       const initialData = {
@@ -242,7 +243,8 @@ function getLocalDB() {
           parsed.users[key] = {
             username: u.username,
             passwordHash: hashPassword(u.plainPass),
-            wilayah: u.wilayah
+            wilayah: u.wilayah,
+            nama: u.nama
           };
         }
         modified = true;
@@ -263,7 +265,8 @@ function getLocalDB() {
         initialUsers[key] = {
           username: u.username,
           passwordHash: hashPassword(u.plainPass),
-          wilayah: u.wilayah
+          wilayah: u.wilayah,
+          nama: u.nama
         };
       }
       const initialData = {
@@ -436,10 +439,10 @@ async function authVerifyUser(usernameInput, passwordInput) {
   const hash = hashPassword(passwordInput);
   if (supabaseClient) {
     try {
-      const { data, error } = await supabaseClient.from("auth_users").select("password_hash, wilayah").eq("username", normUsername).single();
+      const { data, error } = await supabaseClient.from("auth_users").select("password_hash, wilayah, nama").eq("username", normUsername).single();
       if (!error && data) {
         if (data.password_hash === hash) {
-          return { success: true, wilayah: data.wilayah };
+          return { success: true, wilayah: data.wilayah, username: normUsername, nama: data.nama || normUsername };
         }
       }
     } catch (e) {
@@ -450,9 +453,102 @@ async function authVerifyUser(usernameInput, passwordInput) {
   const user = db.users ? db.users[normUsername] : null;
   if (!user) return { success: false };
   if (user.passwordHash === hash) {
-    return { success: true, wilayah: user.wilayah };
+    return { success: true, wilayah: user.wilayah, username: normUsername, nama: user.nama || normUsername };
   }
   return { success: false };
+}
+async function getUserProfile(username) {
+  const normUsername = username.toLowerCase().trim();
+  let userNama = "";
+  let userWilayah = "";
+  if (supabaseClient) {
+    try {
+      const { data, error } = await supabaseClient.from("auth_users").select("wilayah, nama").eq("username", normUsername).single();
+      if (!error && data) {
+        userNama = data.nama || normUsername;
+        userWilayah = data.wilayah;
+      }
+    } catch (e) {
+      console.error("Supabase getUserProfile auth_users error:", e);
+    }
+  }
+  if (!userWilayah) {
+    const db = getLocalDB();
+    const user = db.users ? db.users[normUsername] : null;
+    if (!user) return null;
+    userNama = user.nama || normUsername;
+    userWilayah = user.wilayah;
+  }
+  let nip = "-";
+  let jabatan = "-";
+  if (supabaseClient) {
+    try {
+      const { data, error } = await supabaseClient.from("master_petugas").select("nip, jabatan").eq("wilayah", userWilayah).limit(1);
+      if (!error && data && data.length > 0) {
+        nip = data[0].nip;
+        jabatan = data[0].jabatan;
+      }
+    } catch (e) {
+      console.error("Supabase getUserProfile petugas error:", e);
+    }
+  }
+  if (nip === "-") {
+    const db = getLocalDB();
+    const petugas = db.petugas.find((p) => p.wilayah === userWilayah);
+    if (petugas) {
+      nip = petugas.nip;
+      jabatan = petugas.jabatan;
+    }
+  }
+  return {
+    username: normUsername,
+    nama: userNama,
+    wilayah: userWilayah,
+    nip,
+    jabatan
+  };
+}
+async function changeOwnPassword(username, oldPassword, newPassword) {
+  const normUsername = username.toLowerCase().trim();
+  const authResult = await authVerifyUser(normUsername, oldPassword);
+  if (!authResult.success) {
+    return { success: false, message: "Password saat ini tidak cocok. Periksa kembali." };
+  }
+  const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[^a-zA-Z0-9]).{8,}$/;
+  if (!passwordRegex.test(newPassword)) {
+    return { success: false, message: "Password baru tidak memenuhi kriteria: minimal 8 karakter, 1 huruf besar, 1 huruf kecil, dan 1 karakter khusus." };
+  }
+  if (oldPassword === newPassword) {
+    return { success: false, message: "Password baru tidak boleh sama dengan password saat ini." };
+  }
+  const hashedPass = hashPassword(newPassword);
+  if (supabaseClient) {
+    try {
+      const { error } = await supabaseClient.from("auth_users").update({ password_hash: hashedPass }).eq("username", normUsername);
+      if (error) {
+        console.warn("Supabase changeOwnPassword update failed:", error);
+      }
+    } catch (e) {
+      console.error("Supabase changeOwnPassword error:", e);
+    }
+  }
+  const db = getLocalDB();
+  if (db.users && db.users[normUsername]) {
+    db.users[normUsername].passwordHash = hashedPass;
+  }
+  if (!db.changeLogs) db.changeLogs = [];
+  db.changeLogs.push({
+    id: "CHG-" + Math.floor(1e3 + Math.random() * 9e3),
+    timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+    tipe: "UBAH",
+    idTempat: "SYSTEM-AUTH",
+    namaTempat: `Otorisasi User: ${normUsername}`,
+    wilayah: authResult.wilayah || "",
+    operator: normUsername,
+    deskripsi: `User "${normUsername}" mengubah password sendiri.`
+  });
+  saveLocalDB(db);
+  return { success: true, message: "Password berhasil diubah. Silakan login ulang dengan password baru Anda." };
 }
 async function resetOfficerPassword(usernameTarget, newPasswordInput, operator) {
   const normUsername = usernameTarget.toLowerCase().trim();
@@ -683,6 +779,10 @@ async function insertInspectionLog(payload) {
     }
   }
   const db = getLocalDB();
+  if (payload.id === void 0) {
+    const maxId = db.logs.reduce((max, l) => l.id && l.id > max ? l.id : max, 0);
+    payload.id = maxId + 1;
+  }
   db.logs.push(payload);
   const index = db.tempat.findIndex((t) => t.ID_Tempat === payload.ID_Tempat);
   if (index !== -1) {
@@ -703,6 +803,17 @@ async function deleteInspectionLog(identifier) {
   const isId = !isNaN(numericId) && numericId > 0;
   if (supabaseClient) {
     try {
+      let getLogQuery;
+      if (isId) {
+        getLogQuery = supabaseClient.from("log_inspeksi").select("ID_Tempat").eq("id", numericId).single();
+      } else {
+        getLogQuery = supabaseClient.from("log_inspeksi").select("ID_Tempat").eq("Timestamp", identifier).single();
+      }
+      const { data: logData, error: logGetError } = await getLogQuery;
+      let idTempat = null;
+      if (!logGetError && logData) {
+        idTempat = logData.ID_Tempat;
+      }
       let query;
       if (isId) {
         query = supabaseClient.from("log_inspeksi").delete().eq("id", numericId).select();
@@ -712,6 +823,28 @@ async function deleteInspectionLog(identifier) {
       const { data, error } = await query;
       if (!error && data && data.length > 0) {
         console.log(`Supabase deleteInspectionLog succeeded. Deleted ${data.length} row(s).`);
+        if (idTempat) {
+          const { data: remainingLogs, error: remainingErr } = await supabaseClient.from("log_inspeksi").select("Kesimpulan_Sistem, Timestamp, Total_Skor").eq("ID_Tempat", idTempat).order("Timestamp", { ascending: false }).limit(1);
+          if (!remainingErr) {
+            if (remainingLogs && remainingLogs.length > 0) {
+              const latestLog = remainingLogs[0];
+              const colorStatus = latestLog.Kesimpulan_Sistem === "Memenuhi Syarat" ? "Hijau" : "Merah";
+              const dateObj = new Date(latestLog.Timestamp);
+              const dateStr = `${String(dateObj.getDate()).padStart(2, "0")}/${String(dateObj.getMonth() + 1).padStart(2, "0")}/${dateObj.getFullYear()}`;
+              await supabaseClient.from("master_tempat").update({
+                "Status_Terakhir": colorStatus,
+                "Tgl_Inspeksi": dateStr,
+                "Total_Skor": latestLog.Total_Skor
+              }).eq("ID_Tempat", idTempat);
+            } else {
+              await supabaseClient.from("master_tempat").update({
+                "Status_Terakhir": "Belum",
+                "Tgl_Inspeksi": "",
+                "Total_Skor": ""
+              }).eq("ID_Tempat", idTempat);
+            }
+          }
+        }
         return true;
       } else if (error) {
         console.warn("Supabase deleteInspectionLog error:", error);
@@ -724,12 +857,35 @@ async function deleteInspectionLog(identifier) {
   }
   const db = getLocalDB();
   const originalLength = db.logs.length;
+  let deletedLog = null;
   if (isId) {
+    deletedLog = db.logs.find((l) => l.id === numericId);
     db.logs = db.logs.filter((l) => l.id !== numericId);
   } else {
+    deletedLog = db.logs.find((l) => l.Timestamp === identifier);
     db.logs = db.logs.filter((l) => l.Timestamp !== identifier);
   }
   if (db.logs.length < originalLength) {
+    if (deletedLog) {
+      const idTempat = deletedLog.ID_Tempat;
+      const placeLogs = db.logs.filter((l) => l.ID_Tempat === idTempat).sort((a, b) => new Date(b.Timestamp).getTime() - new Date(a.Timestamp).getTime());
+      const index = db.tempat.findIndex((t) => t.ID_Tempat === idTempat);
+      if (index !== -1) {
+        if (placeLogs.length > 0) {
+          const latestLog = placeLogs[0];
+          const colorStatus = latestLog.Kesimpulan_Sistem === "Memenuhi Syarat" ? "Hijau" : "Merah";
+          const dateObj = new Date(latestLog.Timestamp);
+          const dateStr = `${String(dateObj.getDate()).padStart(2, "0")}/${String(dateObj.getMonth() + 1).padStart(2, "0")}/${dateObj.getFullYear()}`;
+          db.tempat[index].Status_Terakhir = colorStatus;
+          db.tempat[index].Tgl_Inspeksi = dateStr;
+          db.tempat[index].Total_Skor = latestLog.Total_Skor;
+        } else {
+          db.tempat[index].Status_Terakhir = "Belum";
+          db.tempat[index].Tgl_Inspeksi = "";
+          db.tempat[index].Total_Skor = "";
+        }
+      }
+    }
     saveLocalDB(db);
     return true;
   }
@@ -1755,10 +1911,51 @@ var kriteria_TFU = [
 var app = express();
 app.use(express.json({ limit: "15mb" }));
 app.use(express.urlencoded({ extended: true, limit: "15mb" }));
-var TOKEN_SECRET = process.env.SUPABASE_ANON_KEY || "santuari_fallback_secret_2026";
-function generateSignedToken(wilayah) {
+app.use((req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("X-XSS-Protection", "1; mode=block");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  next();
+});
+app.use((req, res, next) => {
+  const allowedOrigins = [
+    "https://santuaribkktbh.web.id",
+    "http://localhost:5173",
+    "http://localhost:3000"
+  ];
+  const origin = req.headers.origin;
+  if (origin && allowedOrigins.includes(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+  }
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.setHeader("Access-Control-Allow-Credentials", "true");
+  if (req.method === "OPTIONS") {
+    return res.status(204).end();
+  }
+  next();
+});
+var loginAttempts = /* @__PURE__ */ new Map();
+var RATE_LIMIT_WINDOW = 15 * 60 * 1e3;
+var RATE_LIMIT_MAX = 10;
+function checkRateLimit(ip) {
+  const now = Date.now();
+  const record = loginAttempts.get(ip);
+  if (!record || now > record.resetTime) {
+    loginAttempts.set(ip, { count: 1, resetTime: now + RATE_LIMIT_WINDOW });
+    return true;
+  }
+  if (record.count >= RATE_LIMIT_MAX) return false;
+  record.count++;
+  return true;
+}
+var TOKEN_SECRET = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || "santuari_fallback_secret_2026";
+function generateSignedToken(wilayah, username) {
   const payload = JSON.stringify({
     wilayah,
+    username,
     exp: Date.now() + 24 * 60 * 60 * 1e3
     // 24 hours
   });
@@ -1795,6 +1992,7 @@ function authenticateToken(req, res, next) {
     return res.status(403).json({ status: "error", message: "Sesi tidak valid atau telah kedalwarsa." });
   }
   req.userWilayah = session.wilayah;
+  req.userName = session.username || "";
   req.token = token;
   next();
 }
@@ -1803,7 +2001,8 @@ app.get("/api/petugas", async (req, res) => {
     const data = await fetchPetugasList();
     res.json({ status: "success", data });
   } catch (err) {
-    res.status(500).json({ status: "error", message: err.toString() });
+    console.error("API Error:", err);
+    res.status(500).json({ status: "error", message: "Terjadi kesalahan internal server." });
   }
 });
 app.post("/api/petugas", authenticateToken, async (req, res) => {
@@ -1822,7 +2021,8 @@ app.post("/api/petugas", authenticateToken, async (req, res) => {
       res.status(500).json({ status: "error", message: "Gagal menyimpan petugas" });
     }
   } catch (err) {
-    res.status(500).json({ status: "error", message: err.toString() });
+    console.error("API Error:", err);
+    res.status(500).json({ status: "error", message: "Terjadi kesalahan internal server." });
   }
 });
 app.delete("/api/petugas/:nip", authenticateToken, async (req, res) => {
@@ -1837,7 +2037,8 @@ app.delete("/api/petugas/:nip", authenticateToken, async (req, res) => {
       res.status(404).json({ status: "error", message: "Petugas tidak ditemukan" });
     }
   } catch (err) {
-    res.status(500).json({ status: "error", message: err.toString() });
+    console.error("API Error:", err);
+    res.status(500).json({ status: "error", message: "Terjadi kesalahan internal server." });
   }
 });
 app.get("/api/dashboard", async (req, res) => {
@@ -1845,29 +2046,70 @@ app.get("/api/dashboard", async (req, res) => {
     const places = await fetchPlaces();
     res.json({ status: "success", data: places });
   } catch (err) {
-    res.status(500).json({ status: "error", message: err.toString() });
+    console.error("API Error:", err);
+    res.status(500).json({ status: "error", message: "Terjadi kesalahan internal server." });
   }
 });
 app.post("/api/auth/verify", async (req, res) => {
   try {
+    const clientIp = req.headers["x-forwarded-for"] || req.ip || "unknown";
+    if (!checkRateLimit(typeof clientIp === "string" ? clientIp : clientIp[0])) {
+      return res.status(429).json({
+        status: "error",
+        message: "Terlalu banyak percobaan login. Silakan coba lagi dalam 15 menit."
+      });
+    }
     const { username, password } = req.body;
     if (!username || !password) {
       return res.status(400).json({ status: "error", message: "Username dan Password wajib diisi." });
     }
     const result = await authVerifyUser(username, password);
     if (result.success && result.wilayah) {
-      const token = generateSignedToken(result.wilayah);
+      const token = generateSignedToken(result.wilayah, result.username || username);
       res.json({
         status: "success",
         message: "Akses Diberikan",
         token,
-        wilayah: result.wilayah
+        wilayah: result.wilayah,
+        username: result.username || username,
+        nama: result.nama || username
       });
     } else {
       res.status(401).json({ status: "error", message: "Kredensial Tidak Valid." });
     }
   } catch (err) {
-    res.status(500).json({ status: "error", message: err.toString() });
+    console.error("API Error:", err);
+    res.status(500).json({ status: "error", message: "Terjadi kesalahan internal server." });
+  }
+});
+app.get("/api/profile", authenticateToken, async (req, res) => {
+  try {
+    const profile = await getUserProfile(req.userName);
+    if (profile) {
+      res.json({ status: "success", data: profile });
+    } else {
+      res.status(404).json({ status: "error", message: "Profil user tidak ditemukan." });
+    }
+  } catch (err) {
+    console.error("API Error:", err);
+    res.status(500).json({ status: "error", message: "Terjadi kesalahan internal server." });
+  }
+});
+app.post("/api/profile/change-password", authenticateToken, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ status: "error", message: "Password saat ini dan password baru wajib diisi." });
+    }
+    const result = await changeOwnPassword(req.userName, currentPassword, newPassword);
+    if (result.success) {
+      res.json({ status: "success", message: result.message });
+    } else {
+      res.status(400).json({ status: "error", message: result.message });
+    }
+  } catch (err) {
+    console.error("API Error:", err);
+    res.status(500).json({ status: "error", message: "Terjadi kesalahan internal server." });
   }
 });
 app.get("/api/kriteria", (req, res) => {
@@ -1877,7 +2119,8 @@ app.get("/api/kriteria", (req, res) => {
     const data = typeStr.startsWith("TPP") ? kriteria_A1A2 : kriteria_TFU;
     res.json({ status: "success", data });
   } catch (err) {
-    res.status(500).json({ status: "error", message: err.toString() });
+    console.error("API Error:", err);
+    res.status(500).json({ status: "error", message: "Terjadi kesalahan internal server." });
   }
 });
 app.get("/api/places/list", async (req, res) => {
@@ -1888,7 +2131,8 @@ app.get("/api/places/list", async (req, res) => {
     const filtered = wStr && wStr !== "Semua" ? allPlaces.filter((p) => p.Wilayah === wStr) : allPlaces;
     res.json({ status: "success", data: filtered });
   } catch (err) {
-    res.status(500).json({ status: "error", message: err.toString() });
+    console.error("API Error:", err);
+    res.status(500).json({ status: "error", message: "Terjadi kesalahan internal server." });
   }
 });
 app.get("/api/rekap", async (req, res) => {
@@ -1931,7 +2175,8 @@ app.get("/api/rekap", async (req, res) => {
     });
     res.json({ status: "success", data: processedLogs });
   } catch (err) {
-    res.status(500).json({ status: "error", message: err.toString() });
+    console.error("API Error:", err);
+    res.status(500).json({ status: "error", message: "Terjadi kesalahan internal server." });
   }
 });
 app.post("/api/auth/reset-pin", authenticateToken, async (req, res) => {
@@ -1957,7 +2202,8 @@ app.post("/api/auth/reset-pin", authenticateToken, async (req, res) => {
       res.status(500).json({ status: "error", message: "Gagal mereset password." });
     }
   } catch (err) {
-    res.status(500).json({ status: "error", message: err.toString() });
+    console.error("API Error:", err);
+    res.status(500).json({ status: "error", message: "Terjadi kesalahan internal server." });
   }
 });
 app.post("/api/tempat", authenticateToken, async (req, res) => {
@@ -1989,7 +2235,8 @@ app.post("/api/tempat", authenticateToken, async (req, res) => {
     const resultId = await insertNewPlace(newPlace, operator);
     res.json({ status: "success", newId: resultId });
   } catch (err) {
-    res.status(500).json({ status: "error", message: err.toString() });
+    console.error("API Error:", err);
+    res.status(500).json({ status: "error", message: "Terjadi kesalahan internal server." });
   }
 });
 app.post("/api/tempat/update", authenticateToken, async (req, res) => {
@@ -2024,7 +2271,8 @@ app.post("/api/tempat/update", authenticateToken, async (req, res) => {
       res.status(404).json({ status: "error", message: "Tempat tidak ditemukan." });
     }
   } catch (err) {
-    res.status(500).json({ status: "error", message: err.toString() });
+    console.error("API Error:", err);
+    res.status(500).json({ status: "error", message: "Terjadi kesalahan internal server." });
   }
 });
 app.post("/api/tempat/delete", authenticateToken, async (req, res) => {
@@ -2041,7 +2289,8 @@ app.post("/api/tempat/delete", authenticateToken, async (req, res) => {
       res.status(404).json({ status: "error", message: "Tempat tidak ditemukan." });
     }
   } catch (err) {
-    res.status(500).json({ status: "error", message: err.toString() });
+    console.error("API Error:", err);
+    res.status(500).json({ status: "error", message: "Terjadi kesalahan internal server." });
   }
 });
 app.get("/api/changelogs", authenticateToken, async (req, res) => {
@@ -2049,7 +2298,8 @@ app.get("/api/changelogs", authenticateToken, async (req, res) => {
     const data = await fetchChangeLogs();
     res.json({ status: "success", data });
   } catch (err) {
-    res.status(500).json({ status: "error", message: err.toString() });
+    console.error("API Error:", err);
+    res.status(500).json({ status: "error", message: "Terjadi kesalahan internal server." });
   }
 });
 app.post("/api/inspeksi", authenticateToken, async (req, res) => {
@@ -2086,7 +2336,8 @@ app.post("/api/inspeksi", authenticateToken, async (req, res) => {
     await insertInspectionLog(inspection);
     res.json({ status: "success" });
   } catch (err) {
-    res.status(500).json({ status: "error", message: err.toString() });
+    console.error("API Error:", err);
+    res.status(500).json({ status: "error", message: "Terjadi kesalahan internal server." });
   }
 });
 app.delete("/api/inspeksi/:identifier", authenticateToken, async (req, res) => {
@@ -2101,8 +2352,12 @@ app.delete("/api/inspeksi/:identifier", authenticateToken, async (req, res) => {
     }
   } catch (err) {
     console.error("DELETE /api/inspeksi error:", err);
-    res.status(500).json({ status: "error", message: err.toString() });
+    res.status(500).json({ status: "error", message: "Terjadi kesalahan internal server." });
   }
+});
+app.use((err, req, res, next) => {
+  console.error("Unhandled Error:", err);
+  res.status(500).json({ status: "error", message: "Terjadi kesalahan internal server." });
 });
 var api_entry_default = app;
 export {

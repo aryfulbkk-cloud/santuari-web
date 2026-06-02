@@ -18,13 +18,16 @@ import {
   fetchChangeLogs,
   resetOfficerPassword,
   savePetugas,
-  deletePetugas
+  deletePetugas,
+  deleteInspectionLog,
+  getUserProfile,
+  changeOwnPassword
 } from "./server/db";
 import { kriteria_A1A2, kriteria_TFU } from "./server/kriteria_data";
 import { LogInspeksi, Tempat } from "./src/types";
 
 // In-memory token storage (Session mapping)
-const ACTIVE_TOKENS = new Map<string, { wilayah: string; expires: number }>();
+const ACTIVE_TOKENS = new Map<string, { wilayah: string; username: string; expires: number }>();
 
 // Authentication Middleware
 function sanitizeString(str: any): string {
@@ -59,6 +62,7 @@ function authenticateToken(req: any, res: any, next: any) {
   // Extend session duration to 3 hours from now on active usage
   session.expires = Date.now() + 3 * 60 * 60 * 1000;
   req.userWilayah = session.wilayah;
+  req.userName = session.username || "";
   req.token = token;
   next();
 }
@@ -153,7 +157,8 @@ async function configureApp() {
         
         // Save session mapped with authority scope (expires in 3 hours)
         ACTIVE_TOKENS.set(token, { 
-          wilayah: result.wilayah, 
+          wilayah: result.wilayah,
+          username: result.username || username,
           expires: Date.now() + 3 * 60 * 60 * 1000 
         });
 
@@ -161,13 +166,47 @@ async function configureApp() {
           status: "success", 
           message: "Akses Diberikan",
           token,
-          wilayah: result.wilayah
+          wilayah: result.wilayah,
+          username: result.username || username,
+          nama: result.nama || username
         });
       } else {
         res.status(401).json({ status: "error", message: "Kredensial Tidak Valid." });
       }
     } catch (err: any) {
       res.status(500).json({ status: "error", message: err.toString() });
+    }
+  });
+
+  // 3b. Get User Profile
+  app.get("/api/profile", authenticateToken, async (req: any, res) => {
+    try {
+      const profile = await getUserProfile(req.userName);
+      if (profile) {
+        res.json({ status: "success", data: profile });
+      } else {
+        res.status(404).json({ status: "error", message: "Profil user tidak ditemukan." });
+      }
+    } catch (err: any) {
+      res.status(500).json({ status: "error", message: "Terjadi kesalahan internal server." });
+    }
+  });
+
+  // 3c. Change Own Password
+  app.post("/api/profile/change-password", authenticateToken, async (req: any, res) => {
+    try {
+      const { currentPassword, newPassword } = req.body;
+      if (!currentPassword || !newPassword) {
+        return res.status(400).json({ status: "error", message: "Password saat ini dan password baru wajib diisi." });
+      }
+      const result = await changeOwnPassword(req.userName, currentPassword, newPassword);
+      if (result.success) {
+        res.json({ status: "success", message: result.message });
+      } else {
+        res.status(400).json({ status: "error", message: result.message });
+      }
+    } catch (err: any) {
+      res.status(500).json({ status: "error", message: "Terjadi kesalahan internal server." });
     }
   });
 
@@ -431,6 +470,23 @@ async function configureApp() {
       res.json({ status: "success" });
     } catch (err: any) {
       res.status(500).json({ status: "error", message: err.toString() });
+    }
+  });
+
+  // Delete inspection log (by Supabase id or Timestamp)
+  app.delete("/api/inspeksi/:identifier", authenticateToken, async (req: any, res) => {
+    try {
+      const identifier = decodeURIComponent(req.params.identifier);
+      console.log("DELETE /api/inspeksi called with identifier:", identifier);
+      const success = await deleteInspectionLog(identifier);
+      if (success) {
+        res.json({ status: "success" });
+      } else {
+        res.status(404).json({ status: "error", message: "Data tidak ditemukan di database." });
+      }
+    } catch (err: any) {
+      console.error("DELETE /api/inspeksi error:", err);
+      res.status(500).json({ status: "error", message: "Terjadi kesalahan internal server." });
     }
   });
 
