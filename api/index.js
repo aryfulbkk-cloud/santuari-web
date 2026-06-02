@@ -689,14 +689,19 @@ async function insertNewUserAccount(username, plainPass, wilayah, nama, operator
   saveLocalDB(db);
   return { success: true, message: `Akun untuk petugas ${nama} (@${normUsername}) berhasil dibuat.` };
 }
-async function updateUserAccountByAdmin(usernameTarget, newNama, newWilayah, operator = "Super Admin") {
-  const normUsername = usernameTarget.toLowerCase().trim();
+async function updateUserAccountByAdmin(usernameTarget, newUsername, newNama, newWilayah, operator = "Super Admin") {
+  const normOldUsername = usernameTarget.toLowerCase().trim();
+  const normNewUsername = newUsername.toLowerCase().trim();
+  if (!normNewUsername || normNewUsername.length < 3 || /\s/.test(normNewUsername)) {
+    return { success: false, message: "Username baru tidak valid. Minimal 3 karakter dan tanpa spasi." };
+  }
   if (supabaseClient) {
     try {
       const { error } = await supabaseClient.from("auth_users").update({
+        username: normNewUsername,
         nama: newNama,
         wilayah: newWilayah
-      }).eq("username", normUsername);
+      }).eq("username", normOldUsername);
       if (error) {
         console.warn("Supabase updateUserAccountByAdmin failed:", error);
       }
@@ -705,18 +710,27 @@ async function updateUserAccountByAdmin(usernameTarget, newNama, newWilayah, ope
     }
   }
   const db = getLocalDB();
-  if (db.users && db.users[normUsername]) {
-    db.users[normUsername].nama = newNama;
-    db.users[normUsername].wilayah = newWilayah;
+  if (db.users && db.users[normOldUsername]) {
+    const userToMove = db.users[normOldUsername];
+    userToMove.username = normNewUsername;
+    userToMove.nama = newNama;
+    userToMove.wilayah = newWilayah;
+    if (normOldUsername !== normNewUsername) {
+      db.users[normNewUsername] = userToMove;
+      delete db.users[normOldUsername];
+    }
   } else {
     if (!db.users) db.users = {};
-    db.users[normUsername] = {
-      username: normUsername,
+    db.users[normNewUsername] = {
+      username: normNewUsername,
       passwordHash: "",
       // Placeholder
       wilayah: newWilayah,
       nama: newNama
     };
+    if (normOldUsername !== normNewUsername) {
+      delete db.users[normOldUsername];
+    }
   }
   if (!db.changeLogs) db.changeLogs = [];
   db.changeLogs.push({
@@ -724,13 +738,13 @@ async function updateUserAccountByAdmin(usernameTarget, newNama, newWilayah, ope
     timestamp: (/* @__PURE__ */ new Date()).toISOString(),
     tipe: "UBAH",
     idTempat: "SYSTEM-AUTH",
-    namaTempat: `Edit Akun: ${normUsername}`,
+    namaTempat: `Edit Akun: ${normOldUsername}`,
     wilayah: newWilayah,
     operator,
-    deskripsi: `Super Admin memperbarui profil akun "${normUsername}" -> Nama: ${newNama}, Wilayah: ${newWilayah}.`
+    deskripsi: `Super Admin memperbarui profil akun "${normOldUsername}" -> Username: ${normNewUsername}, Nama: ${newNama}, Wilayah: ${newWilayah}.`
   });
   saveLocalDB(db);
-  return { success: true, message: `Akun "${normUsername}" berhasil diperbarui.` };
+  return { success: true, message: `Akun berhasil diperbarui.` };
 }
 async function deleteUserAccount(usernameTarget, operator = "Super Admin") {
   const normUsername = usernameTarget.toLowerCase().trim();
@@ -2406,11 +2420,11 @@ app.put("/api/users/:username", authenticateToken, async (req, res) => {
       return res.status(403).json({ status: "error", message: "Akses ditolak: Khusus Super Admin." });
     }
     const { username } = req.params;
-    const { nama, wilayah } = req.body;
-    if (!nama || !wilayah) {
-      return res.status(400).json({ status: "error", message: "Nama dan Wilayah wajib diisi." });
+    const { newUsername, nama, wilayah } = req.body;
+    if (!newUsername || !nama || !wilayah) {
+      return res.status(400).json({ status: "error", message: "Username, Nama, dan Wilayah wajib diisi." });
     }
-    const result = await updateUserAccountByAdmin(username, nama, wilayah, req.userName);
+    const result = await updateUserAccountByAdmin(username, newUsername, nama, wilayah, req.userName);
     if (result.success) {
       res.json({ status: "success", message: result.message });
     } else {
