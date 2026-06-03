@@ -290,52 +290,60 @@ export default function RekapView({ logs, onRefresh }: RekapViewProps) {
               <table className="w-full border-collapse border border-black mb-4 text-[10px]">
                 <thead>
                   <tr className="bg-slate-100">
-                    <th className="border border-black py-1 px-2 text-center w-[7%]">No.</th>
-                    <th className="border border-black py-1 px-2 text-left w-[68%]">Variabel / Komponen yang Dinilai</th>
-                    <th className="border border-black py-1 px-2 text-center w-[25%]">Hasil Observasi</th>
+                    <th className="border border-black py-1 px-2 text-center w-[5%]">No.</th>
+                    <th colSpan={2} className="border border-black py-1 px-2 text-center w-[75%]">Variabel / Komponen yang Dinilai</th>
+                    <th className="border border-black py-1 px-2 text-center w-[20%]">Hasil Observasi</th>
                   </tr>
                 </thead>
                 <tbody>
                   {getDetailArray(selectedLog.Detail_Jawaban).length === 0 ? (
                     <tr>
-                      <td colSpan={3} className="border border-black text-center py-3 text-gray-500">
+                      <td colSpan={4} className="border border-black text-center py-3 text-gray-500">
                         Rincian kriteria tidak tersedia atau terarsip versi lama.
                       </td>
                     </tr>
                   ) : (
-                    getDetailArray(selectedLog.Detail_Jawaban).map((detail, dIdx) => {
+                    getDetailArray(selectedLog.Detail_Jawaban).map((detail, dIdx, arr) => {
                       const isMinus = detail.teksJawaban.includes("Tidak") || detail.teksJawaban.includes("-");
-                      const categoryHeader = dIdx === 0 || getDetailArray(selectedLog.Detail_Jawaban)[dIdx - 1].kategori !== detail.kategori;
+                      const categoryHeader = dIdx === 0 || arr[dIdx - 1].kategori !== detail.kategori;
+                      
+                      const isRealParent = detail.parentNo && detail.parentNo !== detail.no;
+                      const shouldRenderParent = isRealParent && (dIdx === 0 || arr[dIdx - 1].parentNo !== detail.parentNo);
 
                       return (
                         <React.Fragment key={dIdx}>
                           {categoryHeader && (
-                            <tr className="bg-slate-205">
-                              <td colSpan={3} className="border border-black py-0.5 px-2 font-bold uppercase tracking-wide bg-slate-100 text-[9px]">
+                            <tr style={{ backgroundColor: '#fbbf24', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                              <td colSpan={4} className="border border-black py-1 px-2 font-bold tracking-wide text-black text-[10px]">
                                 {detail.kategori}
                               </td>
                             </tr>
                           )}
 
-                          {detail.parentNo && (dIdx === 0 || getDetailArray(selectedLog.Detail_Jawaban)[dIdx - 1].parentNo !== detail.parentNo) && (
-                            <tr className="bg-slate-50">
-                              <td className="border border-black py-0.5 px-2 text-center font-bold">{detail.parentNo}</td>
-                              <td colSpan={2} className="border border-black py-0.5 px-2 font-bold">{detail.parentText}</td>
+                          {shouldRenderParent && (
+                            <tr className="bg-white">
+                              <td className="border border-black py-0.5 px-2 text-center font-bold text-black">{detail.parentNo}</td>
+                              <td colSpan={2} className="border border-black py-0.5 px-2 font-bold text-black">{detail.parentText}</td>
+                              <td className="border border-black bg-gray-50/50 print:bg-gray-50/50"></td>
                             </tr>
                           )}
 
-                          <tr className="page-break-inside-avoid">
-                            <td className="border border-black py-0.5 px-2 text-center">{detail.no}</td>
-                            <td 
-                              className={`border border-black py-0.5 px-2 ${
-                                detail.parentNo ? "pl-5 text-slate-700 font-normal" : "font-bold"
-                              }`}
-                            >
-                              {detail.pertanyaan}
-                            </td>
+                          <tr className="page-break-inside-avoid bg-white">
+                            {isRealParent ? (
+                              <>
+                                <td className="border border-black py-0.5 px-2 text-center text-black"></td>
+                                <td className="border border-black py-0.5 px-2 text-center text-black w-[4%]">{detail.no}.</td>
+                                <td className="border border-black py-0.5 px-2 text-black">{detail.pertanyaan}</td>
+                              </>
+                            ) : (
+                              <>
+                                <td className="border border-black py-0.5 px-2 text-center text-black">{detail.no}</td>
+                                <td colSpan={2} className="border border-black py-0.5 px-2 text-black">{detail.pertanyaan}</td>
+                              </>
+                            )}
                             <td 
                               className={`border border-black py-0.5 px-2 text-center font-bold ${
-                                isMinus ? "text-red-600" : "text-slate-900"
+                                isMinus ? "text-red-600" : "text-black"
                               }`}
                             >
                               {detail.teksJawaban}
