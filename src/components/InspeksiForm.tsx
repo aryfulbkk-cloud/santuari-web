@@ -34,6 +34,7 @@ export default function InspeksiForm({
   
   const [loadingCriteria, setLoadingCriteria] = useState(false);
   const [openSection, setOpenSection] = useState<string>("");
+  const shouldScrollRef = useRef(false);
   const [submitting, setSubmitting] = useState(false);
 
   // Drawing signature pad states for inspector and owner
@@ -64,6 +65,31 @@ export default function InspeksiForm({
     initializeCanvasStyle(canvasRef.current);
     initializeCanvasStyle(ownerCanvasRef.current);
   }, [selectedPlace]);
+
+  // Auto-scroll when category section expands or collapses
+  useEffect(() => {
+    if (!shouldScrollRef.current) return;
+    shouldScrollRef.current = false;
+
+    if (openSection) {
+      const elementId = `category-section-${openSection.replace(/[^a-zA-Z0-9]/g, "-")}`;
+      const timer = setTimeout(() => {
+        const element = document.getElementById(elementId);
+        if (element) {
+          element.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      }, 120);
+      return () => clearTimeout(timer);
+    } else {
+      const timer = setTimeout(() => {
+        const element = document.getElementById("areaPertanyaan");
+        if (element) {
+          element.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      }, 120);
+      return () => clearTimeout(timer);
+    }
+  }, [openSection]);
 
   // Inspector coordinate handler
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
@@ -770,9 +796,16 @@ export default function InspeksiForm({
               }).length;
 
               return (
-                <div key={categoryName} className="bg-white rounded-2xl border border-slate-150 overflow-hidden shadow-sm">
+                <div 
+                  key={categoryName} 
+                  id={`category-section-${categoryName.replace(/[^a-zA-Z0-9]/g, "-")}`}
+                  className="bg-white rounded-2xl border border-slate-150 overflow-hidden shadow-sm"
+                >
                   <button
-                    onClick={() => setOpenSection(isOpen ? "" : categoryName)}
+                    onClick={() => {
+                      shouldScrollRef.current = true;
+                      setOpenSection(isOpen ? "" : categoryName);
+                    }}
                     className="w-full flex justify-between items-center text-left py-4 px-5 bg-slate-50 font-extrabold text-sm text-slate-800 border-b border-slate-100 hover:bg-slate-100 transition-colors"
                   >
                     <div className="flex items-center gap-3">
