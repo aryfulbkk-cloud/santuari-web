@@ -439,16 +439,28 @@ export default function InspeksiForm({
         let parentText = "";
 
         if (isSub) {
-          const mainNo = item.No.split(".")[0];
-          const parentItem = criteria.find(c => c.No === mainNo);
-          if (parentItem) {
-            parentNo = parentItem.No;
-            parentText = parentItem["Kriteria Penilaian"];
+          if (item.No.includes(".")) {
+            const mainNo = item.No.split(".")[0];
+            const parentItem = criteria.find(c => c.No === mainNo);
+            if (parentItem) {
+              parentNo = parentItem.No;
+              parentText = parentItem["Kriteria Penilaian"];
+            }
+          } else if (/^[a-zA-Z]$/.test(item.No)) {
+            // Find the closest preceding item that has a numeric No
+            for (let i = index - 1; i >= 0; i--) {
+              const prevItem = criteria[i];
+              if (/^\d+$/.test(prevItem.No)) {
+                parentNo = prevItem.No;
+                parentText = prevItem["Kriteria Penilaian"];
+                break;
+              }
+            }
           }
         }
 
         detailJawabanList.push({
-          no: item.No.includes('.') ? item.No.split('.')[1] : item.No,
+          no: item.No,
           kategori: item.Kategori,
           pertanyaan: item["Kriteria Penilaian"],
           parentNo: parentNo || undefined,

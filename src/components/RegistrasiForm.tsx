@@ -17,7 +17,7 @@ export default function RegistrasiForm({ currentWilayah, places, onSuccess }: Re
   const [selectedPlaceId, setSelectedPlaceId] = useState<string>("");
 
   const [nama, setNama] = useState("");
-  const [kategori, setKategori] = useState("Tempat Pengolahan Pangan (TPP)");
+  const [kategori, setKategori] = useState("TPP_A1");
   const [alamat, setAlamat] = useState("");
   const [penanggungJawab, setPenanggungJawab] = useState("");
   const [karyawan, setKaryawan] = useState<number | "">("");
@@ -61,7 +61,7 @@ export default function RegistrasiForm({ currentWilayah, places, onSuccess }: Re
       const place = places.find(p => p.ID_Tempat === selectedPlaceId);
       if (place) {
         setNama(place.Nama_Tempat || "");
-        setKategori(place.Kategori || "Tempat Pengolahan Pangan (TPP)");
+        setKategori(place.Kategori || "TPP_A1");
         setAlamat(place.Alamat || "");
         setPenanggungJawab(place.Penanggung_Jawab || "");
         setKaryawan(place.Jml_Karyawan || "");
@@ -96,7 +96,7 @@ export default function RegistrasiForm({ currentWilayah, places, onSuccess }: Re
       }
     } else if (formMode === "tambah") {
       setNama("");
-      setKategori("Tempat Pengolahan Pangan (TPP)");
+      setKategori("TPP_A1");
       setAlamat("");
       setPenanggungJawab("");
       setKaryawan("");
@@ -250,7 +250,7 @@ export default function RegistrasiForm({ currentWilayah, places, onSuccess }: Re
 
   const clearForm = () => {
     setNama("");
-    setKategori("Rumah Makan A1");
+    setKategori("TPP_A1");
     setAlamat("");
     setPenanggungJawab("");
     setKaryawan("");
@@ -532,14 +532,15 @@ export default function RegistrasiForm({ currentWilayah, places, onSuccess }: Re
                   onChange={(e) => setKategori(e.target.value)}
                   className="w-full text-xs font-semibold text-sky-700 bg-white border border-gray-250 focus:border-sky-500 rounded-lg px-3.5 py-2.5 outline-none transition-all shadow-sm"
                 >
-                  <option value="Tempat Pengolahan Pangan (TPP)">Tempat Pengolahan Pangan (TPP)</option>
-                  <option value="Tempat Fasilitas Umum (TFU)">Tempat Fasilitas Umum (TFU)</option>
-                  {kategori && kategori !== "Tempat Pengolahan Pangan (TPP)" && kategori !== "Tempat Fasilitas Umum (TFU)" && (
+                  <option value="TPP_A1">🍽️ Rumah Makan Golongan A1</option>
+                  <option value="TPP_A2">🍽️ Rumah Makan Golongan A2</option>
+                  <option value="Tempat Fasilitas Umum (TFU)">🏢 Tempat Fasilitas Umum (TFU)</option>
+                  {kategori && kategori !== "TPP_A1" && kategori !== "TPP_A2" && kategori !== "Tempat Fasilitas Umum (TFU)" && (
                     <option value={kategori}>{kategori} (Kategori Lama)</option>
                   )}
                 </select>
                 <p className="text-[9px] text-gray-400 mt-1">
-                  Pilih kategori yang sesuai. TPP = Tempat Pengolahan Pangan, TFU = Tempat Fasilitas Umum.
+                  Pilih golongan sesuai standar IKL. A1 = Rumah Makan berkapasitas besar, A2 = Rumah Makan berkapasitas kecil, TFU = Tempat Fasilitas Umum.
                 </p>
               </div>
             </div>
