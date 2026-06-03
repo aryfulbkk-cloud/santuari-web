@@ -1197,9 +1197,7 @@ var kriteria_A1A2 = [
   {
     "No": "6",
     "Kategori": "Inspeksi Area Pelayanan Konsumen",
-    "Kriteria Penilaian": "Peralatan yang digunakan untuk penyajian (piring, sendok, panci dan lainnya):",
-    "A1": "3",
-    "A2": "3"
+    "Kriteria Penilaian": "Peralatan yang digunakan untuk penyajian (piring, sendok, panci dan lainnya):"
   },
   {
     "No": "a",
@@ -1388,9 +1386,7 @@ var kriteria_A1A2 = [
   {
     "No": "12",
     "Kategori": "Umum",
-    "Kriteria Penilaian": "Memiliki ventilasi udara, dengan:",
-    "A1": "1",
-    "A2": "NA"
+    "Kriteria Penilaian": "Memiliki ventilasi udara, dengan:"
   },
   {
     "No": "a",
