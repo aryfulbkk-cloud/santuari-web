@@ -253,9 +253,9 @@ export default function HomeDashboard({
 
   // Doughnut Pie Data for sanitasi states
   const pieData = [
-    { name: "Aman (Hijau)", value: countHijau, color: "#10b981" },
-    { name: "Binaan (Kuning)", value: filteredPlaces.filter(p => p.Status_Terakhir === "Kuning").length, color: "#f59e0b" },
-    { name: "Rawan (Merah)", value: countMerah, color: "#ef4444" },
+    { name: "Memenuhi Syarat", value: countHijau, color: "#10b981" },
+    { name: "Tidak Memenuhi Syarat (Kuning)", value: filteredPlaces.filter(p => p.Status_Terakhir === "Kuning").length, color: "#f59e0b" },
+    { name: "Tidak Memenuhi Syarat (Merah)", value: countMerah, color: "#ef4444" },
     { name: "Belum Diperiksa", value: filteredPlaces.filter(p => p.Status_Terakhir === "Belum").length, color: "#94a3b8" }
   ].filter(item => item.value > 0);
 
@@ -266,9 +266,9 @@ export default function HomeDashboard({
       wilayah: w,
       jmlTPP: itemPlaces.filter(p => isTPP(p.Kategori)).length,
       jmlTFU: itemPlaces.filter(p => isTFU(p.Kategori)).length,
-      aman: itemPlaces.filter(p => p.Status_Terakhir === "Hijau").length,
-      binaan: itemPlaces.filter(p => p.Status_Terakhir === "Kuning").length,
-      rawan: itemPlaces.filter(p => p.Status_Terakhir === "Merah").length
+      memenuhi: itemPlaces.filter(p => p.Status_Terakhir === "Hijau").length,
+      tidakKuning: itemPlaces.filter(p => p.Status_Terakhir === "Kuning").length,
+      tidakMerah: itemPlaces.filter(p => p.Status_Terakhir === "Merah").length
     };
   });
 
@@ -384,7 +384,7 @@ export default function HomeDashboard({
           <div className="absolute top-0 right-0 w-20 h-20 bg-rose-50 rounded-full -mr-6 -mt-6 transition-all group-hover:scale-110 pointer-events-none" />
           <div>
             <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">
-              Kategori Risiko (Merah)
+              Tidak Memenuhi Syarat (Merah)
             </span>
             <div className="flex items-baseline gap-1.5">
               <h3 className="text-3xl font-black text-rose-600 leading-none tracking-tight">
@@ -420,7 +420,7 @@ export default function HomeDashboard({
               />
             </div>
             <div className="flex justify-between text-[9px] text-slate-400 font-bold uppercase tracking-wider">
-              <span>Rasio Aman</span>
+              <span>Rasio Memenuhi Syarat</span>
               <span className="text-emerald-600">{compliantCount} dari {testedCount}</span>
             </div>
           </div>
@@ -464,13 +464,13 @@ export default function HomeDashboard({
             {/* Real-time map status counts */}
             <div className="flex items-center gap-2 text-[9px] font-bold">
               <span className="flex items-center gap-1 text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> {countHijau} Aman
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> {countHijau} MS
               </span>
               <span className="flex items-center gap-1 text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" /> {filteredPlaces.filter(p => p.Status_Terakhir === "Kuning").length} Binaan
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" /> {filteredPlaces.filter(p => p.Status_Terakhir === "Kuning").length} TMS
               </span>
               <span className="flex items-center gap-1 text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full">
-                <span className="w-1.5 h-1.5 rounded-full bg-rose-500" /> {countMerah} Rawan
+                <span className="w-1.5 h-1.5 rounded-full bg-rose-500" /> {countMerah} TMS
               </span>
             </div>
           </div>
@@ -584,17 +584,17 @@ export default function HomeDashboard({
 
               if (place.Status_Terakhir === "Hijau") {
                 statusBadgeBg = "bg-emerald-50 text-emerald-700 border-emerald-100";
-                statusText = "🟢 Aman (Hijau)";
+                statusText = "🟢 Memenuhi Syarat";
                 accentColorHex = "border-t-emerald-500";
                 scoreColorClass = "text-emerald-600";
               } else if (place.Status_Terakhir === "Kuning") {
                 statusBadgeBg = "bg-amber-50 text-amber-700 border-amber-150";
-                statusText = "🟡 Binaan (Kuning)";
+                statusText = "🟡 Tidak Memenuhi Syarat";
                 accentColorHex = "border-t-amber-500";
                 scoreColorClass = "text-amber-600";
               } else if (place.Status_Terakhir === "Merah") {
                 statusBadgeBg = "bg-rose-50 text-rose-700 border-rose-150";
-                statusText = "🔴 Rawan (Merah)";
+                statusText = "🔴 Tidak Memenuhi Syarat";
                 accentColorHex = "border-t-rose-500";
                 scoreColorClass = "text-rose-600";
               }
@@ -769,7 +769,7 @@ export default function HomeDashboard({
         <div className="p-4 px-5 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 bg-gradient-to-r from-slate-50 to-white">
           <div>
             <h4 className="font-extrabold text-slate-800 text-sm">Rekapitulasi Kategori per Wilayah Kerja BKK</h4>
-            <p className="text-[10px] text-slate-400">Peta sebaran total audit aman, binaan, dan rawan tiap kecamatan</p>
+            <p className="text-[10px] text-slate-400">Peta sebaran total audit memenuhi syarat dan tidak memenuhi syarat tiap kecamatan</p>
           </div>
           <button 
             type="button"
@@ -788,9 +788,9 @@ export default function HomeDashboard({
                 <th className="py-3 px-5 tracking-wider">Wilayah Kerja BKK</th>
                 <th className="py-3 px-5 text-center tracking-wider">Target TPP (Kantin / Rumah Makan)</th>
                 <th className="py-3 px-5 text-center tracking-wider">Target TFU (Toilet / Terminal)</th>
-                <th className="py-3 px-5 text-center tracking-wider">🟢 Aman</th>
-                <th className="py-3 px-5 text-center tracking-wider">🟡 Binaan</th>
-                <th className="py-3 px-5 text-center tracking-wider">🔴 Rawan</th>
+                <th className="py-3 px-5 text-center tracking-wider">🟢 MS</th>
+                <th className="py-3 px-5 text-center tracking-wider">🟡 TMS</th>
+                <th className="py-3 px-5 text-center tracking-wider">🔴 TMS</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -801,17 +801,17 @@ export default function HomeDashboard({
                   <td className="py-3 px-5 text-center font-bold text-slate-500">{row.jmlTFU} tempat</td>
                   <td className="py-3 px-5 text-center">
                     <span className="bg-emerald-50 text-emerald-700 border border-emerald-100 font-extrabold px-3.5 py-1 rounded-full text-[10px]">
-                      {row.aman}
+                      {row.memenuhi}
                     </span>
                   </td>
                   <td className="py-3 px-5 text-center">
                     <span className="bg-amber-50 text-amber-700 border border-amber-100 font-extrabold px-3.5 py-1 rounded-full text-[10px]">
-                      {row.binaan}
+                      {row.tidakKuning}
                     </span>
                   </td>
                   <td className="py-3 px-5 text-center">
                     <span className="bg-rose-50 text-rose-700 border border-rose-100 font-extrabold px-3.5 py-1 rounded-full text-[10px]">
-                      {row.rawan}
+                      {row.tidakMerah}
                     </span>
                   </td>
                 </tr>

@@ -1181,7 +1181,8 @@ export async function insertInspectionLog(payload: LogInspeksi): Promise<void> {
 
       if (!logErr) {
         // 2. Update the master place with the last status
-        const colorStatus = payload.Kesimpulan_Sistem === "Memenuhi Syarat" ? "Hijau" : "Merah";
+        const skorNum = parseFloat(String(payload.Total_Skor || "0"));
+        const colorStatus = skorNum >= 80 ? "Hijau" : skorNum >= 50 ? "Kuning" : "Merah";
         const dateObj = new Date(payload.Timestamp);
         const dateStr = `${String(dateObj.getDate()).padStart(2, "0")}/${String(dateObj.getMonth() + 1).padStart(2, "0")}/${dateObj.getFullYear()}`;
         
@@ -1221,7 +1222,8 @@ export async function insertInspectionLog(payload: LogInspeksi): Promise<void> {
   // Update corresponding place state locally
   const index = db.tempat.findIndex(t => t.ID_Tempat === payload.ID_Tempat);
   if (index !== -1) {
-    const colorStatus = payload.Kesimpulan_Sistem === "Memenuhi Syarat" ? "Hijau" : "Merah";
+    const skorNum = parseFloat(String(payload.Total_Skor || "0"));
+    const colorStatus = skorNum >= 80 ? "Hijau" : skorNum >= 50 ? "Kuning" : "Merah";
     const dateObj = new Date(payload.Timestamp);
     const dateStr = `${String(dateObj.getDate()).padStart(2, "0")}/${String(dateObj.getMonth() + 1).padStart(2, "0")}/${dateObj.getFullYear()}`;
 
@@ -1280,7 +1282,8 @@ export async function deleteInspectionLog(identifier: string): Promise<boolean> 
           if (!remainingErr) {
             if (remainingLogs && remainingLogs.length > 0) {
               const latestLog = remainingLogs[0];
-              const colorStatus = latestLog.Kesimpulan_Sistem === "Memenuhi Syarat" ? "Hijau" : "Merah";
+              const skorNum = parseFloat(String(latestLog.Total_Skor || "0"));
+              const colorStatus = skorNum >= 80 ? "Hijau" : skorNum >= 50 ? "Kuning" : "Merah";
               const dateObj = new Date(latestLog.Timestamp);
               const dateStr = `${String(dateObj.getDate()).padStart(2, "0")}/${String(dateObj.getMonth() + 1).padStart(2, "0")}/${dateObj.getFullYear()}`;
 
@@ -1341,7 +1344,8 @@ export async function deleteInspectionLog(identifier: string): Promise<boolean> 
       if (index !== -1) {
         if (placeLogs.length > 0) {
           const latestLog = placeLogs[0];
-          const colorStatus = latestLog.Kesimpulan_Sistem === "Memenuhi Syarat" ? "Hijau" : "Merah";
+          const skorNum = parseFloat(String(latestLog.Total_Skor || "0"));
+          const colorStatus = skorNum >= 80 ? "Hijau" : skorNum >= 50 ? "Kuning" : "Merah";
           const dateObj = new Date(latestLog.Timestamp);
           const dateStr = `${String(dateObj.getDate()).padStart(2, "0")}/${String(dateObj.getMonth() + 1).padStart(2, "0")}/${dateObj.getFullYear()}`;
 

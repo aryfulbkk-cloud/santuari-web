@@ -137,7 +137,7 @@ export default function RekapView({ logs, onRefresh }: RekapViewProps) {
                 </tr>
               ) : (
                 filteredLogs.map((log, index) => {
-                  const isCompliant = log.Kesimpulan_Sistem === "Memenuhi Syarat" || log.Total_Skor >= 70;
+                  const isCompliant = log.Kesimpulan_Sistem === "Memenuhi Syarat" || log.Total_Skor >= 80;
                   return (
                     <tr key={index} className="hover:bg-gray-50/50 transition-colors">
                       <td className="py-3.5 px-5">
@@ -385,7 +385,7 @@ export default function RekapView({ logs, onRefresh }: RekapViewProps) {
                     <td className="border border-black p-2.5 w-[35%] text-center vertical-middle align-middle">
                       <div className="mb-1.5 font-medium text-[10px]">Berdasarkan hasil audit IKL, lokasi ini dinyatakan:</div>
                       <div className={`font-black text-xs uppercase p-1.5 border-[2px] rounded ${
-                        selectedLog.Kesimpulan_Sistem === "Memenuhi Syarat" || selectedLog.Total_Skor >= 70
+                        selectedLog.Kesimpulan_Sistem === "Memenuhi Syarat" || selectedLog.Total_Skor >= 80
                           ? "border-emerald-500 text-emerald-600"
                           : "border-red-500 text-red-600"
                       }`}>
@@ -464,9 +464,6 @@ export default function RekapView({ logs, onRefresh }: RekapViewProps) {
                   <div className="font-bold text-sm uppercase tracking-wide mb-2">
                     DOKUMENTASI KEGIATAN LAPANGAN
                   </div>
-                  <div className="text-xs font-semibold mb-1">
-                    (Paperless Proof of Inspection)
-                  </div>
                   <div className="text-xs text-gray-700 mt-3">
                     Nama TPP/TFU: <strong className="uppercase">{selectedLog.Nama_Tempat}</strong> — {selectedLog.Wilayah}
                   </div>
@@ -483,12 +480,6 @@ export default function RekapView({ logs, onRefresh }: RekapViewProps) {
                         return parsed.map((photo: string, pIdx: number) => (
                           <div key={pIdx} className="border border-gray-300 p-2.5 rounded bg-white text-center inline-block max-w-[48%]">
                             <img src={photo} alt={`Dokumentasi ${pIdx + 1}`} className="max-h-80 max-w-full h-auto object-contain mx-auto rounded" />
-                            <div className="text-[10px] text-gray-800 mt-2 font-serif font-bold italic">
-                              Gambar #{pIdx + 1}: Bukti Inspeksi di {selectedLog.Nama_Tempat}
-                            </div>
-                            <div className="text-[9px] text-gray-500 font-sans mt-0.5">
-                              Diaudit pada {selectedLog.Timestamp.split(" ")[0]}
-                            </div>
                           </div>
                         ));
                       }
@@ -496,17 +487,11 @@ export default function RekapView({ logs, onRefresh }: RekapViewProps) {
                       return (
                         <div className="border border-gray-300 p-2.5 rounded bg-white text-center inline-block max-w-[70%]">
                           <img src={selectedLog.Foto_Dokumentasi} alt="Dokumentasi" className="max-h-80 max-w-full h-auto object-contain mx-auto rounded" />
-                          <div className="text-[10px] text-gray-800 mt-2 font-serif font-bold italic">
-                            Gambar Bukti Inspeksi: {selectedLog.Nama_Tempat}
-                          </div>
                         </div>
                       );
                     }
                     return <div className="text-xs text-gray-400">Tidak ada gambar dokumentasi yang ditemukan.</div>;
                   })()}
-                </div>
-                <div className="text-center text-[10px] text-gray-500 font-sans mt-8 italic border-t border-gray-200 pt-4">
-                  * Seluruh berkas dokumentasi di atas disimpan secara permanen pada sistem cloud SANTUARI BKK Tembilahan dan diakui secara hukum sebagai bukti pengawasan yang sah dan paperless.
                 </div>
               </div>
             )}

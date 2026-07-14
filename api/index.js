@@ -958,7 +958,8 @@ async function insertInspectionLog(payload) {
         "Foto_Dokumentasi": payload.Foto_Dokumentasi || ""
       });
       if (!logErr) {
-        const colorStatus = payload.Kesimpulan_Sistem === "Memenuhi Syarat" ? "Hijau" : "Merah";
+        const skorNum = parseFloat(String(payload.Total_Skor || "0"));
+        const colorStatus = skorNum >= 80 ? "Hijau" : skorNum >= 50 ? "Kuning" : "Merah";
         const dateObj = new Date(payload.Timestamp);
         const dateStr = `${String(dateObj.getDate()).padStart(2, "0")}/${String(dateObj.getMonth() + 1).padStart(2, "0")}/${dateObj.getFullYear()}`;
         const { error: updateErr } = await supabaseClient.from("master_tempat").update({
@@ -986,7 +987,8 @@ async function insertInspectionLog(payload) {
   db.logs.push(payload);
   const index = db.tempat.findIndex((t) => t.ID_Tempat === payload.ID_Tempat);
   if (index !== -1) {
-    const colorStatus = payload.Kesimpulan_Sistem === "Memenuhi Syarat" ? "Hijau" : "Merah";
+    const skorNum = parseFloat(String(payload.Total_Skor || "0"));
+    const colorStatus = skorNum >= 80 ? "Hijau" : skorNum >= 50 ? "Kuning" : "Merah";
     const dateObj = new Date(payload.Timestamp);
     const dateStr = `${String(dateObj.getDate()).padStart(2, "0")}/${String(dateObj.getMonth() + 1).padStart(2, "0")}/${dateObj.getFullYear()}`;
     db.tempat[index].Status_Terakhir = colorStatus;
@@ -1028,7 +1030,8 @@ async function deleteInspectionLog(identifier) {
           if (!remainingErr) {
             if (remainingLogs && remainingLogs.length > 0) {
               const latestLog = remainingLogs[0];
-              const colorStatus = latestLog.Kesimpulan_Sistem === "Memenuhi Syarat" ? "Hijau" : "Merah";
+              const skorNum = parseFloat(String(latestLog.Total_Skor || "0"));
+              const colorStatus = skorNum >= 80 ? "Hijau" : skorNum >= 50 ? "Kuning" : "Merah";
               const dateObj = new Date(latestLog.Timestamp);
               const dateStr = `${String(dateObj.getDate()).padStart(2, "0")}/${String(dateObj.getMonth() + 1).padStart(2, "0")}/${dateObj.getFullYear()}`;
               await supabaseClient.from("master_tempat").update({
@@ -1073,7 +1076,8 @@ async function deleteInspectionLog(identifier) {
       if (index !== -1) {
         if (placeLogs.length > 0) {
           const latestLog = placeLogs[0];
-          const colorStatus = latestLog.Kesimpulan_Sistem === "Memenuhi Syarat" ? "Hijau" : "Merah";
+          const skorNum = parseFloat(String(latestLog.Total_Skor || "0"));
+          const colorStatus = skorNum >= 80 ? "Hijau" : skorNum >= 50 ? "Kuning" : "Merah";
           const dateObj = new Date(latestLog.Timestamp);
           const dateStr = `${String(dateObj.getDate()).padStart(2, "0")}/${String(dateObj.getMonth() + 1).padStart(2, "0")}/${dateObj.getFullYear()}`;
           db.tempat[index].Status_Terakhir = colorStatus;

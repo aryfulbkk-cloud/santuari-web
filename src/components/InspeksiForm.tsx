@@ -519,7 +519,7 @@ export default function InspeksiForm({
     }
 
     skorAkhir = Math.round(skorAkhir * 100) / 100;
-    const kesimpulan = skorAkhir >= 70 ? "Memenuhi Syarat" : "Tidak Memenuhi Syarat";
+    const kesimpulan = skorAkhir >= 80 ? "Memenuhi Syarat" : "Tidak Memenuhi Syarat";
 
     const payload = {
       idTempat: selectedPlaceId,

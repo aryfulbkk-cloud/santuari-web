@@ -71,7 +71,7 @@ export interface TabSummaryRow {
   wilayah: string;
   jmlTPP: number;
   jmlTFU: number;
-  aman: number; // Hijau
-  binaan: number; // Kuning
-  rawan: number; // Merah
+  memenuhi: number; // Hijau
+  tidakKuning: number; // Kuning
+  tidakMerah: number; // Merah
 }
