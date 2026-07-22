@@ -1,7 +1,7 @@
 import React, { useState, useEffect, Suspense, useCallback } from "react";
 import { 
   LayoutDashboard, ShieldCheck, ClipboardCheck, MapPin, 
-  FolderCheck, LogOut, ShieldAlert, Heart, Menu, Loader2, UserCircle 
+  FolderCheck, LogOut, ShieldAlert, Heart, Menu, Loader2, UserCircle, Calculator 
 } from "lucide-react";
 
 import LoadingSkeleton from "./components/LoadingSkeleton";
@@ -17,11 +17,12 @@ const SuperAdminPetugas = React.lazy(() =>
   import("./components/SuperAdminPetugas").then(m => ({ default: m.SuperAdminPetugas }))
 );
 const UserProfile = React.lazy(() => import("./components/UserProfile"));
+const KalkulatorCahaya = React.lazy(() => import("./components/KalkulatorCahaya"));
 import { ErrorBoundary } from "./ErrorBoundary";
 import { Tempat, LogInspeksi, Petugas } from "./types";
 
 export default function App() {
-  const [activeView, setActiveView] = useState<"dashboard" | "inspeksi" | "registrasi" | "rekap" | "superadmin" | "profile">("dashboard");
+  const [activeView, setActiveView] = useState<"dashboard" | "inspeksi" | "registrasi" | "rekap" | "superadmin" | "profile" | "kalkulator-cahaya">("dashboard");
   
   // Lazy init auth states with 3-hour local check
   const [isLoggedIn, setIsLoggedIn] = useState(() => {
@@ -308,6 +309,21 @@ export default function App() {
 
                   <button
                     onClick={() => {
+                      setActiveView("kalkulator-cahaya");
+                      setMobileSidebarOpen(false);
+                    }}
+                    className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg font-medium text-xs leading-none transition-all ${
+                      activeView === "kalkulator-cahaya"
+                        ? "bg-sky-50 text-sky-700 font-semibold"
+                        : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                    }`}
+                  >
+                    <Calculator className="w-4 h-4" />
+                    <span>Kalkulator K3 Cahaya</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
                       setActiveView("registrasi");
                       setMobileSidebarOpen(false);
                     }}
@@ -501,6 +517,10 @@ export default function App() {
                 userNama={userNama}
                 currentWilayah={currentWilayah}
               />
+            )}
+
+            {isLoggedIn && activeView === "kalkulator-cahaya" && (
+              <KalkulatorCahaya />
             )}
             </Suspense>
           </div>
