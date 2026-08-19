@@ -439,7 +439,9 @@ export async function fetchPlaces(): Promise<Tempat[]> {
           Tgl_Inspeksi: d.tgl_inspeksi || d.Tgl_Inspeksi,
           Total_Skor: d.total_skor || d.Total_Skor,
           Penanggung_Jawab: d.penanggung_jawab || d.Penanggung_Jawab,
-          Jml_Karyawan: d.jml_karyawan || d.Jml_Karyawan
+          Jml_Karyawan: d.jml_karyawan || d.Jml_Karyawan,
+          Status_Aktif: d.status_aktif || d.Status_Aktif || "Aktif",
+          Avatar: d.avatar || d.Avatar || ""
         })) as Tempat[];
       }
       console.warn("Supabase fetchPlaces error, falling back:", error);
@@ -589,7 +591,8 @@ export async function getUserProfile(username: string): Promise<{
           nip = exactMatch.nip;
           jabatan = exactMatch.jabatan;
           petugasNama = exactMatch.nama || "";
-        } else if (data.length === 1) {
+        } else if (data.length === 1 && userNama.toLowerCase().trim().startsWith("petugas")) {
+          // Hanya gunakan fallback jika akun login tersebut adalah akun default (legacy) yg diawali "Petugas ..."
           nip = data[0].nip;
           jabatan = data[0].jabatan;
           petugasNama = data[0].nama || "";
@@ -609,7 +612,7 @@ export async function getUserProfile(username: string): Promise<{
         nip = exactMatch.nip;
         jabatan = exactMatch.jabatan;
         petugasNama = exactMatch.nama || "";
-      } else if (petugasList.length === 1) {
+      } else if (petugasList.length === 1 && userNama.toLowerCase().trim().startsWith("petugas")) {
         nip = petugasList[0].nip;
         jabatan = petugasList[0].jabatan;
         petugasNama = petugasList[0].nama || "";
@@ -617,9 +620,13 @@ export async function getUserProfile(username: string): Promise<{
     }
   }
 
+  // Jika nama tidak sinkron antara auth_users dan master_petugas, 
+  // jangan overwrite nama login dengan nama orang lain!
+  const finalNama = (petugasNama && petugasNama !== "") ? petugasNama : (userNama || normUsername);
+
   return {
     username: normUsername,
-    nama: petugasNama || userNama || normUsername,
+    nama: finalNama,
     wilayah: userWilayah,
     nip,
     jabatan
@@ -1089,7 +1096,38 @@ export async function updatePlace(id: string, updated: Tempat, operator: string 
   const descLog = changesDelta.length > 0 
     ? `Mengubah data tempat: ${changesDelta.join(", ")}`
     : `Memperbarui info sarana tanpa merubah isian dasar`;
-    
+
+  // ============================================================
+  // BUG FIX: Write update to Supabase (was missing — only wrote to local JSON)
+  // Column names match exactly with insertNewPlace() convention
+  // ============================================================
+  if (supabaseClient) {
+    try {
+      const { error } = await supabaseClient.from("master_tempat").update({
+        "Nama_Tempat": updated.Nama_Tempat,
+        "Wilayah": updated.Wilayah,
+        "Kategori": updated.Kategori,
+        "Alamat": updated.Alamat,
+        "Koordinat_Map": updated.Koordinat_Map,
+        "Status_Terakhir": updated.Status_Terakhir || original.Status_Terakhir || "Belum",
+        "Tgl_Inspeksi": updated.Tgl_Inspeksi || original.Tgl_Inspeksi || "",
+        "Total_Skor": updated.Total_Skor === "-" ? null : (updated.Total_Skor || original.Total_Skor),
+        "Penanggung_Jawab": updated.Penanggung_Jawab || "",
+        "Jml_Karyawan": updated.Jml_Karyawan || 0,
+        "Status_Aktif": updated.Status_Aktif || "Aktif",
+        "Avatar": updated.Avatar || original.Avatar || ""
+      }).eq("ID_Tempat", id);
+      if (!error) {
+        console.log(`Supabase updatePlace succeeded for ${id}.`);
+      } else {
+        console.warn("Supabase updatePlace failed:", error);
+      }
+    } catch (e) {
+      console.error("Supabase update error, saving locally only:", e);
+    }
+  }
+
+  // Always write locally as fallback
   db.tempat[index] = {
     ...original,
     ...updated,
@@ -1124,6 +1162,22 @@ export async function deletePlace(id: string, operator: string): Promise<boolean
   
   if (operator !== "Tembilahan Induk") {
     throw new Error("Hanya admin dari induk Tembilahan yang berwenang meniadakan tempat");
+  }
+
+  // ============================================================
+  // BUG FIX: Delete from Supabase (was missing — only deleted from local JSON)
+  // ============================================================
+  if (supabaseClient) {
+    try {
+      const { error } = await supabaseClient.from("master_tempat").delete().eq("ID_Tempat", id);
+      if (!error) {
+        console.log(`Supabase deletePlace succeeded for ${id}.`);
+      } else {
+        console.warn("Supabase deletePlace failed:", error);
+      }
+    } catch (e) {
+      console.error("Supabase delete error, removing locally only:", e);
+    }
   }
   
   db.tempat.splice(index, 1);
@@ -1176,7 +1230,8 @@ export async function insertInspectionLog(payload: LogInspeksi): Promise<void> {
 
       if (!logErr) {
         // 2. Update the master place with the last status
-        const colorStatus = payload.Kesimpulan_Sistem === "Memenuhi Syarat" ? "Hijau" : "Merah";
+        const skorNum = parseFloat(String(payload.Total_Skor || "0"));
+        const colorStatus = skorNum >= 80 ? "Hijau" : skorNum >= 50 ? "Kuning" : "Merah";
         const dateObj = new Date(payload.Timestamp);
         const dateStr = `${String(dateObj.getDate()).padStart(2, "0")}/${String(dateObj.getMonth() + 1).padStart(2, "0")}/${dateObj.getFullYear()}`;
         
@@ -1216,7 +1271,8 @@ export async function insertInspectionLog(payload: LogInspeksi): Promise<void> {
   // Update corresponding place state locally
   const index = db.tempat.findIndex(t => t.ID_Tempat === payload.ID_Tempat);
   if (index !== -1) {
-    const colorStatus = payload.Kesimpulan_Sistem === "Memenuhi Syarat" ? "Hijau" : "Merah";
+    const skorNum = parseFloat(String(payload.Total_Skor || "0"));
+    const colorStatus = skorNum >= 80 ? "Hijau" : skorNum >= 50 ? "Kuning" : "Merah";
     const dateObj = new Date(payload.Timestamp);
     const dateStr = `${String(dateObj.getDate()).padStart(2, "0")}/${String(dateObj.getMonth() + 1).padStart(2, "0")}/${dateObj.getFullYear()}`;
 
@@ -1275,7 +1331,8 @@ export async function deleteInspectionLog(identifier: string): Promise<boolean> 
           if (!remainingErr) {
             if (remainingLogs && remainingLogs.length > 0) {
               const latestLog = remainingLogs[0];
-              const colorStatus = latestLog.Kesimpulan_Sistem === "Memenuhi Syarat" ? "Hijau" : "Merah";
+              const skorNum = parseFloat(String(latestLog.Total_Skor || "0"));
+              const colorStatus = skorNum >= 80 ? "Hijau" : skorNum >= 50 ? "Kuning" : "Merah";
               const dateObj = new Date(latestLog.Timestamp);
               const dateStr = `${String(dateObj.getDate()).padStart(2, "0")}/${String(dateObj.getMonth() + 1).padStart(2, "0")}/${dateObj.getFullYear()}`;
 
@@ -1336,7 +1393,8 @@ export async function deleteInspectionLog(identifier: string): Promise<boolean> 
       if (index !== -1) {
         if (placeLogs.length > 0) {
           const latestLog = placeLogs[0];
-          const colorStatus = latestLog.Kesimpulan_Sistem === "Memenuhi Syarat" ? "Hijau" : "Merah";
+          const skorNum = parseFloat(String(latestLog.Total_Skor || "0"));
+          const colorStatus = skorNum >= 80 ? "Hijau" : skorNum >= 50 ? "Kuning" : "Merah";
           const dateObj = new Date(latestLog.Timestamp);
           const dateStr = `${String(dateObj.getDate()).padStart(2, "0")}/${String(dateObj.getMonth() + 1).padStart(2, "0")}/${dateObj.getFullYear()}`;
 
