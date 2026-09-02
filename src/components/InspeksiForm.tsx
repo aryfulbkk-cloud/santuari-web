@@ -28,6 +28,7 @@ export default function InspeksiForm({
 
   const [karyawan, setKaryawan] = useState<number | "">("");
   const [penjamah, setPenjamah] = useState<number | "">("");
+  const [tanggalInspeksi, setTanggalInspeksi] = useState(() => new Date().toISOString().split("T")[0]); // YYYY-MM-DD
   
   const [criteria, setCriteria] = useState<KriteriaItem[]>([]);
   const [answers, setAnswers] = useState<Record<string, { value: number; teks: string; item: KriteriaItem }>>({});
@@ -396,30 +397,22 @@ export default function InspeksiForm({
       return;
     }
 
-    // Validate Inspector signature
+    // Inspector signature (optional)
     const canvas = canvasRef.current;
     let ttdBase64 = "";
-    if (!hasInspectorDrawn || !canvas) {
-      setErrorMassage("Tanda tangan petugas pemeriksa wajib digoreskan pada kotak.");
-      return;
+    if (hasInspectorDrawn && canvas) {
+      ttdBase64 = canvas.toDataURL("image/png");
     }
-    ttdBase64 = canvas.toDataURL("image/png");
 
-    // Validate Owner signature
+    // Owner signature (optional)
     const ownerCanvas = ownerCanvasRef.current;
     let ttdPemilikBase64 = "";
-    if (!hasOwnerDrawn || !ownerCanvas) {
-      setErrorMassage("Tanda tangan pemilik / penanggung jawab bangunan wajib digoreskan pada kotak.");
-      return;
+    if (hasOwnerDrawn && ownerCanvas) {
+      ttdPemilikBase64 = ownerCanvas.toDataURL("image/png");
     }
-    ttdPemilikBase64 = ownerCanvas.toDataURL("image/png");
 
-    // Validate minimal 1 foto
-    if (photos.length === 0) {
-      setErrorMassage("Bukti dokumentasi kegiatan wajib diupload minimal 1 foto kegiatan.");
-      return;
-    }
-    const fotoDokumentasiBase64 = JSON.stringify(photos);
+    // Documentation photos (optional)
+    const fotoDokumentasiBase64 = photos.length > 0 ? JSON.stringify(photos) : "";
 
     // Identify total answerable points
     // Questions are rows where Bobot or A1/A2 exists (not a section header).
@@ -529,6 +522,7 @@ export default function InspeksiForm({
       pj: selectedPlace.Penanggung_Jawab || "-",
       jmlKaryawan: karyawan === "" ? 0 : Number(karyawan),
       jmlPenjamah: penjamah === "" ? 0 : Number(penjamah),
+      tanggalInspeksi,
       skorAkhir,
       kesimpulan,
       totalNilai: totalDeductionsOrPoints,
@@ -729,6 +723,17 @@ export default function InspeksiForm({
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Tanggal Pemeriksaan</label>
+                <input 
+                  type="date" 
+                  value={tanggalInspeksi}
+                  onChange={(e) => setTanggalInspeksi(e.target.value)}
+                  className="w-full text-xs font-bold text-slate-700 bg-white border border-slate-200 focus:border-sky-500 rounded-xl px-4 py-2.5 outline-none shadow-sm"
+                  id="insTanggal"
+                />
+              </div>
+
               <div>
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Jml. Karyawan Terkini</label>
                 <input 
@@ -931,7 +936,7 @@ export default function InspeksiForm({
             
             <p className="text-xs text-slate-500">
               Silakan ambil foto menggunakan kamera perangkat Anda atau pilih dari galeri. 
-              <span className="text-rose-600 font-bold ml-1">* Wajib diunggah minimal 1 foto kegiatan untuk keabsahan berita acara paperless.</span>
+              <span className="text-slate-400 font-semibold ml-1">(Opsional — tidak wajib diisi)</span>
             </p>
 
             <div
