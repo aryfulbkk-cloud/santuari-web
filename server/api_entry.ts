@@ -597,9 +597,9 @@ app.post("/api/inspeksi", authenticateToken, async (req: any, res) => {
     const sanitizedPemeriksaNip = sanitizeString(payload.pemeriksaNip);
     const sanitizedPemeriksaJabatan = sanitizeString(payload.pemeriksaJabatan);
 
-    // Use user-selected date if provided; fall back to now
+    // Use user-selected date if provided; force it to noon UTC to prevent timezone shifts
     const inspectionDate = payload.tanggalInspeksi 
-      ? new Date(payload.tanggalInspeksi + "T00:00:00").toISOString()
+      ? new Date(payload.tanggalInspeksi + "T12:00:00Z").toISOString()
       : new Date().toISOString();
 
     const inspection: LogInspeksi = {
