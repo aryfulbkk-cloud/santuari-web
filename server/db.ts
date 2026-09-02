@@ -439,7 +439,9 @@ export async function fetchPlaces(): Promise<Tempat[]> {
           Tgl_Inspeksi: d.tgl_inspeksi || d.Tgl_Inspeksi,
           Total_Skor: d.total_skor || d.Total_Skor,
           Penanggung_Jawab: d.penanggung_jawab || d.Penanggung_Jawab,
-          Jml_Karyawan: d.jml_karyawan || d.Jml_Karyawan
+          Jml_Karyawan: d.jml_karyawan || d.Jml_Karyawan,
+          Status_Aktif: d.status_aktif || d.Status_Aktif || "Aktif",
+          Avatar: d.avatar || d.Avatar || ""
         })) as Tempat[];
       }
       console.warn("Supabase fetchPlaces error, falling back:", error);
@@ -1094,7 +1096,38 @@ export async function updatePlace(id: string, updated: Tempat, operator: string 
   const descLog = changesDelta.length > 0 
     ? `Mengubah data tempat: ${changesDelta.join(", ")}`
     : `Memperbarui info sarana tanpa merubah isian dasar`;
-    
+
+  // ============================================================
+  // BUG FIX: Write update to Supabase (was missing — only wrote to local JSON)
+  // Column names match exactly with insertNewPlace() convention
+  // ============================================================
+  if (supabaseClient) {
+    try {
+      const { error } = await supabaseClient.from("master_tempat").update({
+        "Nama_Tempat": updated.Nama_Tempat,
+        "Wilayah": updated.Wilayah,
+        "Kategori": updated.Kategori,
+        "Alamat": updated.Alamat,
+        "Koordinat_Map": updated.Koordinat_Map,
+        "Status_Terakhir": updated.Status_Terakhir || original.Status_Terakhir || "Belum",
+        "Tgl_Inspeksi": updated.Tgl_Inspeksi || original.Tgl_Inspeksi || "",
+        "Total_Skor": updated.Total_Skor === "-" ? null : (updated.Total_Skor || original.Total_Skor),
+        "Penanggung_Jawab": updated.Penanggung_Jawab || "",
+        "Jml_Karyawan": updated.Jml_Karyawan || 0,
+        "Status_Aktif": updated.Status_Aktif || "Aktif",
+        "Avatar": updated.Avatar || original.Avatar || ""
+      }).eq("ID_Tempat", id);
+      if (!error) {
+        console.log(`Supabase updatePlace succeeded for ${id}.`);
+      } else {
+        console.warn("Supabase updatePlace failed:", error);
+      }
+    } catch (e) {
+      console.error("Supabase update error, saving locally only:", e);
+    }
+  }
+
+  // Always write locally as fallback
   db.tempat[index] = {
     ...original,
     ...updated,
@@ -1129,6 +1162,22 @@ export async function deletePlace(id: string, operator: string): Promise<boolean
   
   if (operator !== "Tembilahan Induk") {
     throw new Error("Hanya admin dari induk Tembilahan yang berwenang meniadakan tempat");
+  }
+
+  // ============================================================
+  // BUG FIX: Delete from Supabase (was missing — only deleted from local JSON)
+  // ============================================================
+  if (supabaseClient) {
+    try {
+      const { error } = await supabaseClient.from("master_tempat").delete().eq("ID_Tempat", id);
+      if (!error) {
+        console.log(`Supabase deletePlace succeeded for ${id}.`);
+      } else {
+        console.warn("Supabase deletePlace failed:", error);
+      }
+    } catch (e) {
+      console.error("Supabase delete error, removing locally only:", e);
+    }
   }
   
   db.tempat.splice(index, 1);
