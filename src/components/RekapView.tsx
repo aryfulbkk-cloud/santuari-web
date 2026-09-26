@@ -275,7 +275,8 @@ export default function RekapView({ logs, onRefresh }: RekapViewProps) {
                   LAPORAN HASIL INSPEKSI KESEHATAN LINGKUNGAN (IKL)
                 </h3>
                 <div className="text-[10px]">
-                  Nomor: {selectedLog.ID_Tempat.split("-")[1]} / BKK-TBH / IKL / {selectedLog.Timestamp.split(" ")[0].split("/")[2]}
+                  {/* ✅ FIX: Extract year properly from ISO timestamp */}
+                  Nomor: {selectedLog.ID_Tempat.split("-")[1]} / BKK-TBH / IKL / {new Date(selectedLog.Timestamp).getFullYear()}
                 </div>
               </div>
 
