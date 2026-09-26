@@ -17,8 +17,8 @@ export default function RekapView({ logs, onRefresh }: RekapViewProps) {
     try {
       if (!raw || raw === "Tgl tidak valid") return "-";
 
-      // Format DD/MM/YYYY (sent by server after our fix)
-      const ddmmyyyy = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+      // Format DD/MM/YYYY or DD/MM/YYYY HH:mm
+      const ddmmyyyy = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
       if (ddmmyyyy) {
         const [, dd, mm, yyyy] = ddmmyyyy;
         const d = new Date(Number(yyyy), Number(mm) - 1, Number(dd));
@@ -286,7 +286,7 @@ export default function RekapView({ logs, onRefresh }: RekapViewProps) {
                 </h3>
                 <div className="text-[10px]">
                   {/* ✅ FIX: Server sends DD/MM/YYYY — extract year from index [2] */}
-                  Nomor: {selectedLog.ID_Tempat.split("-")[1]} / BKK-TBH / IKL / {selectedLog.Timestamp.split("/")[2] || new Date().getFullYear()}
+                  Nomor: {selectedLog.ID_Tempat.split("-")[1]} / BKK-TBH / IKL / {selectedLog.Timestamp.split("/")[2]?.split(" ")[0] || new Date().getFullYear()}
                 </div>
               </div>
 
