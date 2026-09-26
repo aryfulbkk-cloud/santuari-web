@@ -351,7 +351,7 @@ app.get("/api/rekap", async (req, res) => {
       };
     });
 
-    // Sort newest first using DD/MM/YYYY format
+    // Sort newest first using DD/MM/YYYY format, then by id descending
     processedLogs.sort((a, b) => {
       const parseDate = (str: string) => {
         const parts = str.split("/");
@@ -359,7 +359,9 @@ app.get("/api/rekap", async (req, res) => {
         const [d, m, y] = parts.map(Number);
         return new Date(y, m - 1, d).getTime();
       };
-      return parseDate(b.Timestamp) - parseDate(a.Timestamp);
+      const diff = parseDate(b.Timestamp) - parseDate(a.Timestamp);
+      if (diff !== 0) return diff;
+      return ((b as any).id || 0) - ((a as any).id || 0);
     });
 
     res.json({ status: "success", data: processedLogs });
