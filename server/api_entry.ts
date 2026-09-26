@@ -228,6 +228,7 @@ app.post("/api/auth/verify", async (req, res) => {
 
     if (result.success && result.wilayah) {
       const token = generateSignedToken(result.wilayah, result.username || username);
+      const profile = await getUserProfile(result.username || username);
 
       res.json({
         status: "success",
@@ -235,7 +236,9 @@ app.post("/api/auth/verify", async (req, res) => {
         token,
         wilayah: result.wilayah,
         username: result.username || username,
-        nama: result.nama || username
+        nama: profile?.nama || result.nama || username,
+        nip: profile?.nip || "-",
+        jabatan: profile?.jabatan || "-"
       });
     } else {
       res.status(401).json({ status: "error", message: "Kredensial Tidak Valid." });
