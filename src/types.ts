@@ -75,3 +75,26 @@ export interface TabSummaryRow {
   tidakKuning: number; // Kuning
   tidakMerah: number; // Merah
 }
+
+/** Draft Laporan — disimpan di localStorage browser (offline-first) */
+export interface DraftLaporan {
+  draftId: string;          // unique ID: "draft_{timestamp}_{placeId}"
+  savedAt: string;          // ISO timestamp terakhir disimpan
+  filterKategoriJenis: "" | "TPP" | "TFU";
+  selectedPlaceId: string;
+  selectedPlaceName: string;
+  selectedPlaceKategori: string;
+  selectedOfficerName: string;
+  tanggalInspeksi: string;  // YYYY-MM-DD
+  karyawan: number | "";
+  penjamah: number | "";
+  answers: Record<string, { value: number; teks: string; item: KriteriaItem }>;
+  hasInspectorDrawn: boolean;
+  ttdBase64: string;
+  ttdPemilikBase64: string;
+  photos: string[];
+  totalQuestions: number;   // total pertanyaan yang bisa dijawab
+  answeredCount: number;    // sudah dijawab
+  completionPercent: number; // 0-100
+  isReadyToSubmit: boolean; // semua pertanyaan dijawab + place + officer
+}

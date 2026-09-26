@@ -1,7 +1,8 @@
 import React, { useState, useEffect, Suspense, useCallback } from "react";
 import { 
   LayoutDashboard, ShieldCheck, ClipboardCheck, MapPin, 
-  FolderCheck, LogOut, ShieldAlert, Heart, Menu, Loader2, UserCircle, Calculator 
+  FolderCheck, LogOut, ShieldAlert, Heart, Menu, Loader2, UserCircle, Calculator,
+  BookMarked
 } from "lucide-react";
 
 import LoadingSkeleton from "./components/LoadingSkeleton";
@@ -18,11 +19,13 @@ const SuperAdminPetugas = React.lazy(() =>
 );
 const UserProfile = React.lazy(() => import("./components/UserProfile"));
 const KalkulatorCahaya = React.lazy(() => import("./components/KalkulatorCahaya"));
+const DraftLaporanView = React.lazy(() => import("./components/DraftLaporanView"));
 import { ErrorBoundary } from "./ErrorBoundary";
-import { Tempat, LogInspeksi, Petugas } from "./types";
+import { Tempat, LogInspeksi, Petugas, DraftLaporan } from "./types";
+import { countDrafts } from "./utils/draftStorage";
 
 export default function App() {
-  const [activeView, setActiveView] = useState<"dashboard" | "inspeksi" | "registrasi" | "rekap" | "superadmin" | "profile" | "kalkulator-cahaya">("dashboard");
+  const [activeView, setActiveView] = useState<"dashboard" | "inspeksi" | "registrasi" | "rekap" | "superadmin" | "profile" | "kalkulator-cahaya" | "draft-laporan">("dashboard");
   
   // Lazy init auth states with 3-hour local check
   const [isLoggedIn, setIsLoggedIn] = useState(() => {
@@ -78,6 +81,21 @@ export default function App() {
   const [logs, setLogs] = useState<LogInspeksi[]>([]);
   const [officers, setOfficers] = useState<Petugas[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Draft Laporan state
+  const [draftToLoad, setDraftToLoad] = useState<DraftLaporan | null>(null);
+  const [draftCount, setDraftCount] = useState(() => countDrafts());
+  const [draftRefreshKey, setDraftRefreshKey] = useState(0);
+
+  // Refresh draft count whenever activeView changes or draft is saved/deleted
+  const refreshDraftCount = useCallback(() => {
+    setDraftCount(countDrafts());
+    setDraftRefreshKey(k => k + 1);
+  }, []);
+
+  useEffect(() => {
+    refreshDraftCount();
+  }, [activeView, refreshDraftCount]);
 
   // Greeting based on server/local hour
   const getGreeting = () => {
@@ -295,6 +313,7 @@ export default function App() {
                   <button
                     onClick={() => {
                       setActiveView("inspeksi");
+                      setDraftToLoad(null);
                       setMobileSidebarOpen(false);
                     }}
                     className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg font-medium text-xs leading-none transition-all ${
@@ -305,6 +324,26 @@ export default function App() {
                   >
                     <ClipboardCheck className="w-4 h-4" />
                     <span>Input Inspeksi IKL</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setActiveView("draft-laporan");
+                      setMobileSidebarOpen(false);
+                    }}
+                    className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg font-medium text-xs leading-none transition-all ${
+                      activeView === "draft-laporan"
+                        ? "bg-amber-50 text-amber-700 font-semibold"
+                        : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                    }`}
+                  >
+                    <BookMarked className="w-4 h-4" />
+                    <span className="flex-1 text-left">Draft Laporan</span>
+                    {draftCount > 0 && (
+                      <span className="bg-amber-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full leading-none">
+                        {draftCount}
+                      </span>
+                    )}
                   </button>
 
                   <button
@@ -448,7 +487,7 @@ export default function App() {
         ) : (
           /* Actual Content views */
           <div className="flex-1 print:block">
-            <Suspense fallback={<LoadingSkeleton variant={activeView === "rekap" ? "table" : activeView === "inspeksi" || activeView === "registrasi" ? "form" : "chart"} />}>
+            <Suspense fallback={<LoadingSkeleton variant={activeView === "rekap" ? "table" : activeView === "inspeksi" || activeView === "registrasi" || activeView === "draft-laporan" ? "form" : "chart"} />}>
             {activeView === "dashboard" && (
               <HomeDashboard 
                 places={places} 
@@ -477,9 +516,27 @@ export default function App() {
                 currentWilayah={currentWilayah}
                 places={places}
                 officers={officers}
+                draftToLoad={draftToLoad}
+                onDraftSaved={refreshDraftCount}
                 onSuccess={() => {
                   synchAllData();
+                  setDraftToLoad(null);
+                  refreshDraftCount();
                   setActiveView("dashboard");
+                }}
+              />
+            )}
+
+            {isLoggedIn && activeView === "draft-laporan" && (
+              <DraftLaporanView
+                refreshKey={draftRefreshKey}
+                onLanjutkan={(draft) => {
+                  setDraftToLoad(draft);
+                  setActiveView("inspeksi");
+                }}
+                onGoToInspeksi={() => {
+                  setDraftToLoad(null);
+                  setActiveView("inspeksi");
                 }}
               />
             )}
