@@ -261,11 +261,19 @@ async function configureApp() {
       // Format logs output with Bulan_Kegiatan and formatted Timestamp
       const processedLogs = logs.map(log => {
         const dObj = new Date(log.Timestamp);
-        const dateStr = !isNaN(dObj.getTime()) 
-          ? `${String(dObj.getDate()).padStart(2, "0")}/${String(dObj.getMonth() + 1).padStart(2, "0")}/${dObj.getFullYear()} ${String(dObj.getHours()).padStart(2, "0")}:${String(dObj.getMinutes()).padStart(2, "0")}`
+        const isValid = !isNaN(dObj.getTime());
+
+        // ✅ FIX: Convert to WIB (UTC+7) before formatting
+        const wibOffset = 7 * 60 * 60 * 1000;
+        const dWIB = isValid ? new Date(dObj.getTime() + wibOffset) : null;
+
+        // Format tanggal WIB: DD/MM/YYYY (without time — frontend handles display)
+        const dateStr = dWIB
+          ? `${String(dWIB.getUTCDate()).padStart(2, "0")}/${String(dWIB.getUTCMonth() + 1).padStart(2, "0")}/${dWIB.getUTCFullYear()}`
           : "Tgl tidak valid";
-        const bulan = !isNaN(dObj.getTime())
-          ? bulanIndo[dObj.getMonth()] + " " + dObj.getFullYear()
+
+        const bulan = dWIB
+          ? bulanIndo[dWIB.getUTCMonth()] + " " + dWIB.getUTCFullYear()
           : "Lainnya";
 
         return {
@@ -275,14 +283,13 @@ async function configureApp() {
         };
       });
 
-      // Sort with newest first
+      // Sort with newest first using DD/MM/YYYY format
       processedLogs.sort((a, b) => {
         const parseDate = (str: string) => {
-          const parts = str.split(" ");
-          if (parts.length < 2) return 0;
-          const [d, m, y] = parts[0].split("/").map(Number);
-          const [hr, min] = parts[1].split(":").map(Number);
-          return new Date(y, m - 1, d, hr, min).getTime();
+          const parts = str.split("/");
+          if (parts.length < 3) return 0;
+          const [d, m, y] = parts.map(Number);
+          return new Date(y, m - 1, d).getTime();
         };
         return parseDate(b.Timestamp) - parseDate(a.Timestamp);
       });
@@ -292,6 +299,7 @@ async function configureApp() {
       res.status(500).json({ status: "error", message: err.toString() });
     }
   });
+
 
   // 3b. Reset Password for Officer (Super Admin only)
   app.post("/api/auth/reset-pin", authenticateToken, async (req: any, res) => {
