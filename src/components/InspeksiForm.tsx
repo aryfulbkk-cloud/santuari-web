@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { 
   ClipboardCheck, Info, Users, PenTool, Save, CheckCircle2, 
   HelpCircle, ChevronDown, ListTodo, FileWarning, UploadCloud, Trash2, Camera,
-  BookMarked
+  BookMarked, Lock, ShieldCheck, UserCheck
 } from "lucide-react";
 import { Petugas, Tempat, KriteriaItem, DetailJawaban, DraftLaporan } from "../types";
 import { saveDraft, deleteDraft, generateDraftId } from "../utils/draftStorage";
@@ -14,6 +14,12 @@ interface InspeksiFormProps {
   onSuccess: () => void;
   draftToLoad?: DraftLaporan | null;
   onDraftSaved?: () => void;
+  currentUser?: {
+    username?: string;
+    nama?: string;
+    nip?: string;
+    jabatan?: string;
+  };
 }
 
 export default function InspeksiForm({ 
@@ -22,16 +28,63 @@ export default function InspeksiForm({
   officers, 
   onSuccess,
   draftToLoad,
-  onDraftSaved
- 
+  onDraftSaved,
+  currentUser
 }: InspeksiFormProps) {
-  
+  // Lock officer identity automatically based on logged-in user
+  const activeOfficer: Petugas = useMemo(() => {
+    const userNamaClean = (currentUser?.nama || "").trim();
+    const userNipClean = (currentUser?.nip || "").trim();
+
+    // 1. If currentUser has valid NIP, find in officers or construct Petugas
+    if (userNipClean && userNipClean !== "-") {
+      const byNip = officers.find(o => o.nip === userNipClean);
+      if (byNip) return byNip;
+      return {
+        nama: userNamaClean || currentUser?.username || "Petugas BKK",
+        nip: userNipClean,
+        jabatan: (currentUser?.jabatan && currentUser.jabatan !== "-") ? currentUser.jabatan : "Inspektur Kesling",
+        wilayah: currentWilayah
+      };
+    }
+
+    // 2. Try match by name in officers list
+    if (userNamaClean) {
+      const byName = officers.find(o => {
+        const oNama = (o.nama || "").toLowerCase().trim();
+        const uNama = userNamaClean.toLowerCase();
+        return oNama === uNama || oNama.includes(uNama) || uNama.includes(oNama);
+      });
+      if (byName) return byName;
+    }
+
+    // 3. Try match by wilayah if only 1 officer for this wilayah
+    const byWilayah = officers.filter(o => o.wilayah === currentWilayah);
+    if (byWilayah.length === 1) {
+      return byWilayah[0];
+    }
+
+    // 4. Fallback to currentUser values or default
+    return {
+      nama: userNamaClean || currentUser?.username || "Petugas BKK",
+      nip: (currentUser?.nip && currentUser.nip !== "-") ? currentUser.nip : "-",
+      jabatan: (currentUser?.jabatan && currentUser.jabatan !== "-") ? currentUser.jabatan : "Inspektur Kesling",
+      wilayah: currentWilayah
+    };
+  }, [currentUser, officers, currentWilayah]);
+
   const [filterKategoriJenis, setFilterKategoriJenis] = useState<"" | "TPP" | "TFU">("");
   const [selectedPlaceId, setSelectedPlaceId] = useState("");
   const [selectedPlace, setSelectedPlace] = useState<Tempat | null>(null);
   
-  const [selectedOfficerName, setSelectedOfficerName] = useState("");
-  const [selectedOfficer, setSelectedOfficer] = useState<Petugas | null>(null);
+  const [selectedOfficerName, setSelectedOfficerName] = useState(activeOfficer.nama);
+  const [selectedOfficer, setSelectedOfficer] = useState<Petugas | null>(activeOfficer);
+
+  useEffect(() => {
+    setSelectedOfficer(activeOfficer);
+    setSelectedOfficerName(activeOfficer.nama);
+  }, [activeOfficer]);
+
 
   const [karyawan, setKaryawan] = useState<number | "">("");
   const [penjamah, setPenjamah] = useState<number | "">("");
@@ -413,14 +466,10 @@ export default function InspeksiForm({
 
   const [errMassage, setErrorMassage] = useState("");
 
-  // Handle Simpan Draft — minimal: harus ada sarana + petugas terpilih
+  // Handle Simpan Draft — minimal: harus ada sarana terpilih
   const handleSaveDraft = async () => {
     if (!selectedPlace) {
       setErrorMassage("Pilih lokasi sarana terlebih dahulu sebelum menyimpan draft.");
-      return;
-    }
-    if (!selectedOfficer) {
-      setErrorMassage("Pilih nama petugas pemeriksa sebelum menyimpan draft.");
       return;
     }
 
@@ -461,7 +510,7 @@ export default function InspeksiForm({
       selectedPlaceId,
       selectedPlaceName: selectedPlace.Nama_Tempat,
       selectedPlaceKategori: selectedPlace.Kategori,
-      selectedOfficerName,
+      selectedOfficerName: activeOfficer.nama,
       tanggalInspeksi,
       karyawan,
       penjamah,
@@ -489,10 +538,7 @@ export default function InspeksiForm({
       setErrorMassage("Harap pilih lokasi target terlebih dahulu.");
       return;
     }
-    if (!selectedOfficer) {
-      setErrorMassage("Pilih nama Petugas Pemeriksa.");
-      return;
-    }
+
 
     // Inspector signature (optional)
     const canvas = canvasRef.current;
@@ -624,9 +670,9 @@ export default function InspeksiForm({
       kesimpulan,
       totalNilai: totalDeductionsOrPoints,
       detailJawaban: detailJawabanList,
-      pemeriksaNama: selectedOfficer.nama,
-      pemeriksaNip: selectedOfficer.nip,
-      pemeriksaJabatan: selectedOfficer.jabatan,
+      pemeriksaNama: activeOfficer.nama,
+      pemeriksaNip: activeOfficer.nip,
+      pemeriksaJabatan: activeOfficer.jabatan,
       ttdBase64,
       ttdPemilikBase64,
       fotoDokumentasiBase64
@@ -748,22 +794,33 @@ export default function InspeksiForm({
           </div>
 
           <div>
-            <label className="text-[11px] font-black text-sky-700 uppercase block mb-1.5 tracking-wider">
-              3. Petugas Pemeriksa BKK
-            </label>
-            <select
-              value={selectedOfficerName}
-              onChange={(e) => handleOfficerChange(e.target.value)}
-              className="w-full text-xs font-bold text-slate-700 bg-slate-50 border border-slate-200 focus:border-sky-500 rounded-xl px-4 py-3 outline-none shadow-sm cursor-pointer"
-              id="insPilihPetugas"
-            >
-              <option value="">-- Pilih Nama Petugas --</option>
-              {availableOfficers.map((o) => (
-                <option key={o.nip} value={o.nama}>
-                  {o.nama} - {o.jabatan} {o.wilayah && o.wilayah !== "Semua Wilayah" ? `(${o.wilayah})` : ""}
-                </option>
-              ))}
-            </select>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-[11px] font-black text-sky-700 uppercase tracking-wider flex items-center gap-1.5">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                <span>3. Petugas Pemeriksa BKK</span>
+              </label>
+              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                <Lock className="w-2.5 h-2.5" /> Terkunci Akun Login
+              </span>
+            </div>
+            <div className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 shadow-sm flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-sky-100 text-sky-700 font-black flex items-center justify-center shrink-0 border border-sky-200">
+                <UserCheck className="w-4 h-4 text-sky-600" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-bold text-slate-800 truncate" id="insPetugasNama">
+                  {activeOfficer.nama}
+                </p>
+                <div className="flex flex-wrap items-center gap-x-2 text-[10px] text-slate-500 mt-0.5">
+                  <span>NIP: <strong className="text-slate-700">{activeOfficer.nip || "-"}</strong></span>
+                  <span>•</span>
+                  <span>{activeOfficer.jabatan || "Inspektur Kesling"}</span>
+                </div>
+              </div>
+            </div>
+            <p className="text-[9px] text-slate-400 mt-1">
+              Nama &amp; NIP terkunci otomatis dari akun petugas yang sedang login.
+            </p>
           </div>
         </div>
         )}
@@ -1128,7 +1185,7 @@ export default function InspeksiForm({
                 />
               </div>
               <p className="text-[10px] text-slate-450 italic leading-snug">
-                * Goreskan coretan tanda tangan {selectedOfficer ? selectedOfficer.nama : "Petugas"} pada pad di atas.
+                * Goreskan coretan tanda tangan {activeOfficer.nama} (NIP: {activeOfficer.nip || "-"}) pada pad di atas.
               </p>
             </div>
 
