@@ -381,7 +381,9 @@ async function fetchPlaces() {
           Tgl_Inspeksi: d.tgl_inspeksi || d.Tgl_Inspeksi,
           Total_Skor: d.total_skor || d.Total_Skor,
           Penanggung_Jawab: d.penanggung_jawab || d.Penanggung_Jawab,
-          Jml_Karyawan: d.jml_karyawan || d.Jml_Karyawan
+          Jml_Karyawan: d.jml_karyawan || d.Jml_Karyawan,
+          Status_Aktif: d.status_aktif || d.Status_Aktif || "Aktif",
+          Avatar: d.avatar || d.Avatar || ""
         }));
       }
       console.warn("Supabase fetchPlaces error, falling back:", error);
@@ -886,6 +888,31 @@ async function updatePlace(id, updated, operator = "Sistem") {
     changesDelta.push(`Avatar Gambar diubah`);
   }
   const descLog = changesDelta.length > 0 ? `Mengubah data tempat: ${changesDelta.join(", ")}` : `Memperbarui info sarana tanpa merubah isian dasar`;
+  if (supabaseClient) {
+    try {
+      const { error } = await supabaseClient.from("master_tempat").update({
+        "Nama_Tempat": updated.Nama_Tempat,
+        "Wilayah": updated.Wilayah,
+        "Kategori": updated.Kategori,
+        "Alamat": updated.Alamat,
+        "Koordinat_Map": updated.Koordinat_Map,
+        "Status_Terakhir": updated.Status_Terakhir || original.Status_Terakhir || "Belum",
+        "Tgl_Inspeksi": updated.Tgl_Inspeksi || original.Tgl_Inspeksi || "",
+        "Total_Skor": updated.Total_Skor === "-" ? null : updated.Total_Skor || original.Total_Skor,
+        "Penanggung_Jawab": updated.Penanggung_Jawab || "",
+        "Jml_Karyawan": updated.Jml_Karyawan || 0,
+        "Status_Aktif": updated.Status_Aktif || "Aktif",
+        "Avatar": updated.Avatar || original.Avatar || ""
+      }).eq("ID_Tempat", id);
+      if (!error) {
+        console.log(`Supabase updatePlace succeeded for ${id}.`);
+      } else {
+        console.warn("Supabase updatePlace failed:", error);
+      }
+    } catch (e) {
+      console.error("Supabase update error, saving locally only:", e);
+    }
+  }
   db.tempat[index] = {
     ...original,
     ...updated,
@@ -914,6 +941,18 @@ async function deletePlace(id, operator) {
   const place = db.tempat[index];
   if (operator !== "Tembilahan Induk") {
     throw new Error("Hanya admin dari induk Tembilahan yang berwenang meniadakan tempat");
+  }
+  if (supabaseClient) {
+    try {
+      const { error } = await supabaseClient.from("master_tempat").delete().eq("ID_Tempat", id);
+      if (!error) {
+        console.log(`Supabase deletePlace succeeded for ${id}.`);
+      } else {
+        console.warn("Supabase deletePlace failed:", error);
+      }
+    } catch (e) {
+      console.error("Supabase delete error, removing locally only:", e);
+    }
   }
   db.tempat.splice(index, 1);
   db.changeLogs.push({
@@ -2266,13 +2305,16 @@ app.post("/api/auth/verify", async (req, res) => {
     const result = await authVerifyUser(username, password);
     if (result.success && result.wilayah) {
       const token = generateSignedToken(result.wilayah, result.username || username);
+      const profile = await getUserProfile(result.username || username);
       res.json({
         status: "success",
         message: "Akses Diberikan",
         token,
         wilayah: result.wilayah,
         username: result.username || username,
-        nama: result.nama || username
+        nama: profile?.nama || result.nama || username,
+        nip: profile?.nip || "-",
+        jabatan: profile?.jabatan || "-"
       });
     } else {
       res.status(401).json({ status: "error", message: "Kredensial Tidak Valid." });
@@ -2355,8 +2397,11 @@ app.get("/api/rekap", async (req, res) => {
     ];
     const processedLogs = logs.map((log) => {
       const dObj = new Date(log.Timestamp);
-      const dateStr = !isNaN(dObj.getTime()) ? `${String(dObj.getDate()).padStart(2, "0")}/${String(dObj.getMonth() + 1).padStart(2, "0")}/${dObj.getFullYear()} ${String(dObj.getHours()).padStart(2, "0")}:${String(dObj.getMinutes()).padStart(2, "0")}` : "Tgl tidak valid";
-      const bulan = !isNaN(dObj.getTime()) ? bulanIndo[dObj.getMonth()] + " " + dObj.getFullYear() : "Lainnya";
+      const isValid = !isNaN(dObj.getTime());
+      const wibOffset = 7 * 60 * 60 * 1e3;
+      const dWIB = isValid ? new Date(dObj.getTime() + wibOffset) : null;
+      const dateStr = dWIB ? `${String(dWIB.getUTCDate()).padStart(2, "0")}/${String(dWIB.getUTCMonth() + 1).padStart(2, "0")}/${dWIB.getUTCFullYear()}` : "Tgl tidak valid";
+      const bulan = dWIB ? bulanIndo[dWIB.getUTCMonth()] + " " + dWIB.getUTCFullYear() : "Lainnya";
       return {
         ...log,
         Timestamp: dateStr,
@@ -2365,11 +2410,10 @@ app.get("/api/rekap", async (req, res) => {
     });
     processedLogs.sort((a, b) => {
       const parseDate = (str) => {
-        const parts = str.split(" ");
-        if (parts.length < 2) return 0;
-        const [d, m, y] = parts[0].split("/").map(Number);
-        const [hr, min] = parts[1].split(":").map(Number);
-        return new Date(y, m - 1, d, hr, min).getTime();
+        const parts = str.split("/");
+        if (parts.length < 3) return 0;
+        const [d, m, y] = parts.map(Number);
+        return new Date(y, m - 1, d).getTime();
       };
       return parseDate(b.Timestamp) - parseDate(a.Timestamp);
     });
@@ -2587,8 +2631,9 @@ app.post("/api/inspeksi", authenticateToken, async (req, res) => {
     const sanitizedPemeriksaNama = sanitizeString(payload.pemeriksaNama);
     const sanitizedPemeriksaNip = sanitizeString(payload.pemeriksaNip);
     const sanitizedPemeriksaJabatan = sanitizeString(payload.pemeriksaJabatan);
+    const inspectionDate = payload.tanggalInspeksi ? (/* @__PURE__ */ new Date(payload.tanggalInspeksi + "T12:00:00Z")).toISOString() : (/* @__PURE__ */ new Date()).toISOString();
     const inspection = {
-      Timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+      Timestamp: inspectionDate,
       ID_Tempat: payload.idTempat,
       Nama_Tempat: sanitizedNamaTempat,
       Wilayah: payload.wilayah,
