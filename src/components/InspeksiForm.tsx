@@ -381,26 +381,38 @@ export default function InspeksiForm({
   });
 
   // Select place from list and loads related checking criteria
-  const handlePlaceChange = async (placeId: string) => {
+  // Optional preservedAnswers: pass draft answers to restore them AFTER criteria load (prevents answers being wiped)
+  const handlePlaceChange = async (
+    placeId: string,
+    preservedAnswers?: Record<string, { value: number; teks: string; item: KriteriaItem }>
+  ) => {
     setSelectedPlaceId(placeId);
     setErrorMassage("");
-    const plc = localPlaces.find(p => p.ID_Tempat === placeId) || null;
+
+    // Search from ALL places (not localPlaces) so draft loading works even before filterKategoriJenis settles
+    const plc = places.find(p => p.ID_Tempat === placeId) || null;
     setSelectedPlace(plc);
     
     if (!plc) {
       setCriteria([]);
-      setAnswers({});
+      if (!preservedAnswers) setAnswers({});
       return;
     }
 
-    setKaryawan(plc.Jml_Karyawan || "");
-    setPenjamah("");
+    // Only reset karyawan/penjamah to place defaults when NOT loading from draft
+    if (!preservedAnswers) {
+      setKaryawan(plc.Jml_Karyawan || "");
+      setPenjamah("");
+    }
 
     const isTPP = isTPPKategori(plc.Kategori);
     const jenis = isTPP ? (plc.Kategori.includes("A2") ? "TPP_A2" : "TPP_A1") : "TFU";
 
     setLoadingCriteria(true);
-    setAnswers({});
+    // Only reset answers when NOT loading from draft (preservedAnswers = null)
+    if (!preservedAnswers) {
+      setAnswers({});
+    }
     
     try {
       const response = await fetch(`/api/kriteria?jenis=${jenis}`);
@@ -410,6 +422,10 @@ export default function InspeksiForm({
         // Automatically default open first categorization tab
         if (res.data.length > 0) {
           setOpenSection(res.data[0].Kategori);
+        }
+        // ✅ Apply saved draft answers AFTER criteria are loaded
+        if (preservedAnswers) {
+          setAnswers(preservedAnswers);
         }
       } else {
         alert("Gagal memuat kriteria checklist.");
@@ -449,19 +465,32 @@ export default function InspeksiForm({
   };
 
   // Load draft when draftToLoad prop changes
+  // FIX: Must call handlePlaceChange (not just setSelectedPlaceId) so criteria gets fetched
+  // and pass preservedAnswers so existing answers are restored instead of wiped
   useEffect(() => {
     if (!draftToLoad) return;
+
+    // Restore all non-criteria-dependent fields first
     setFilterKategoriJenis(draftToLoad.filterKategoriJenis);
-    setSelectedPlaceId(draftToLoad.selectedPlaceId);
-    setSelectedOfficerName(draftToLoad.selectedOfficerName);
     setTanggalInspeksi(draftToLoad.tanggalInspeksi);
     setKaryawan(draftToLoad.karyawan);
     setPenjamah(draftToLoad.penjamah);
-    setAnswers(draftToLoad.answers);
     setHasInspectorDrawn(draftToLoad.hasInspectorDrawn);
     setHasOwnerDrawn(!!draftToLoad.ttdPemilikBase64);
     setPhotos(draftToLoad.photos || []);
     setCurrentDraftId(draftToLoad.draftId);
+
+    // Capture answers snapshot before async call
+    const savedAnswers = draftToLoad.answers;
+    const savedPlaceId = draftToLoad.selectedPlaceId;
+
+    // Trigger place change to fetch criteria, passing saved answers to be restored after load
+    // setTimeout ensures React state for filterKategoriJenis has settled before calling
+    setTimeout(() => {
+      handlePlaceChange(savedPlaceId, savedAnswers);
+    }, 50);
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draftToLoad]);
 
   const [errMassage, setErrorMassage] = useState("");
