@@ -11,20 +11,30 @@ export default function RekapView({ logs, onRefresh }: RekapViewProps) {
   const [search, setSearch] = useState("");
   const [selectedLog, setSelectedLog] = useState<LogInspeksi | null>(null);
 
-  // ✅ Format ISO timestamp to Indonesian date string: "12 Agustus 2026"
-  const formatTanggal = (isoString: string): string => {
+  // ✅ Format tanggal ke format Indonesia panjang: "12 Agustus 2026"
+  // Handles two formats from server: "DD/MM/YYYY" and ISO "2026-08-12T12:00:00.000Z"
+  const formatTanggal = (raw: string): string => {
     try {
-      if (!isoString) return "-";
-      const d = new Date(isoString);
-      if (isNaN(d.getTime())) return isoString;
-      return d.toLocaleDateString("id-ID", {
-        day: "2-digit",
-        month: "long",
-        year: "numeric",
-        timeZone: "Asia/Jakarta"
-      });
+      if (!raw || raw === "Tgl tidak valid") return "-";
+
+      // Format DD/MM/YYYY (sent by server after our fix)
+      const ddmmyyyy = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+      if (ddmmyyyy) {
+        const [, dd, mm, yyyy] = ddmmyyyy;
+        const d = new Date(Number(yyyy), Number(mm) - 1, Number(dd));
+        return d.toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" });
+      }
+
+      // Fallback: ISO string or other formats — parse with Date
+      const d = new Date(raw);
+      if (isNaN(d.getTime())) return raw;
+      // Use UTC+7 for display since server already stored in UTC
+      const wibOffset = 7 * 60 * 60 * 1000;
+      const dWIB = new Date(d.getTime() + wibOffset);
+      const bulanIndo = ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"];
+      return `${String(dWIB.getUTCDate()).padStart(2,"0")} ${bulanIndo[dWIB.getUTCMonth()]} ${dWIB.getUTCFullYear()}`;
     } catch {
-      return isoString;
+      return raw;
     }
   };
 
@@ -275,8 +285,8 @@ export default function RekapView({ logs, onRefresh }: RekapViewProps) {
                   LAPORAN HASIL INSPEKSI KESEHATAN LINGKUNGAN (IKL)
                 </h3>
                 <div className="text-[10px]">
-                  {/* ✅ FIX: Extract year properly from ISO timestamp */}
-                  Nomor: {selectedLog.ID_Tempat.split("-")[1]} / BKK-TBH / IKL / {new Date(selectedLog.Timestamp).getFullYear()}
+                  {/* ✅ FIX: Server sends DD/MM/YYYY — extract year from index [2] */}
+                  Nomor: {selectedLog.ID_Tempat.split("-")[1]} / BKK-TBH / IKL / {selectedLog.Timestamp.split("/")[2] || new Date().getFullYear()}
                 </div>
               </div>
 
