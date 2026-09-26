@@ -166,13 +166,17 @@ async function configureApp() {
           expires: Date.now() + 3 * 60 * 60 * 1000 
         });
 
+        const profile = await getUserProfile(result.username || username);
+
         res.json({ 
           status: "success", 
           message: "Akses Diberikan",
           token,
           wilayah: result.wilayah,
           username: result.username || username,
-          nama: result.nama || username
+          nama: profile?.nama || result.nama || username,
+          nip: profile?.nip || "-",
+          jabatan: profile?.jabatan || "-"
         });
       } else {
         res.status(401).json({ status: "error", message: "Kredensial Tidak Valid." });
@@ -518,8 +522,13 @@ async function configureApp() {
       const sanitizedPemeriksaNip = sanitizeString(payload.pemeriksaNip);
       const sanitizedPemeriksaJabatan = sanitizeString(payload.pemeriksaJabatan);
 
+      // Use user-selected date if provided; force it to noon UTC to prevent timezone shifts
+      const inspectionDate = payload.tanggalInspeksi 
+        ? new Date(payload.tanggalInspeksi + "T12:00:00Z").toISOString()
+        : new Date().toISOString();
+
       const inspection: LogInspeksi = {
-        Timestamp: new Date().toISOString(),
+        Timestamp: inspectionDate,
         ID_Tempat: payload.idTempat,
         Nama_Tempat: sanitizedNamaTempat,
         Wilayah: payload.wilayah,
