@@ -11,6 +11,31 @@ export default function RekapView({ logs, onRefresh }: RekapViewProps) {
   const [search, setSearch] = useState("");
   const [selectedLog, setSelectedLog] = useState<LogInspeksi | null>(null);
 
+  // ✅ Format ISO timestamp to Indonesian date string: "12 Agustus 2026"
+  const formatTanggal = (isoString: string): string => {
+    try {
+      if (!isoString) return "-";
+      const d = new Date(isoString);
+      if (isNaN(d.getTime())) return isoString;
+      return d.toLocaleDateString("id-ID", {
+        day: "2-digit",
+        month: "long",
+        year: "numeric",
+        timeZone: "Asia/Jakarta"
+      });
+    } catch {
+      return isoString;
+    }
+  };
+
+  // ✅ Convert internal category codes to human-readable Indonesian labels
+  const formatKategori = (kat: string): string => {
+    if (kat === "TPP_A1") return "Tempat Pengelolaan Pangan (TPP) Golongan A1";
+    if (kat === "TPP_A2") return "Tempat Pengelolaan Pangan (TPP) Golongan A2";
+    if (kat === "TFU")    return "Tempat Fasilitas Umum (TFU)";
+    return kat; // fallback: tampilkan apa adanya
+  };
+
   const handleDelete = async (log: LogInspeksi) => {
     if (confirm(`Apakah Anda yakin ingin menghapus arsip inspeksi untuk ${log.Nama_Tempat}?\nAksi ini tidak dapat dibatalkan.`)) {
       try {
@@ -94,7 +119,7 @@ export default function RekapView({ logs, onRefresh }: RekapViewProps) {
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-gray-200 mb-6">
           <div>
             <h3 className="text-lg font-bold text-gray-800 tracking-tight">Rekap Hasil Inspeksi IKL</h3>
-            <p className="text-xs text-gray-400">Arsip digital dan cetak berita acara hasil IKL lapangan.</p>
+            <p className="text-xs text-gray-400">Arsip digital dan cetak laporan hasil IKL lapangan.</p>
           </div>
           <button 
             onClick={onRefresh}
@@ -142,13 +167,15 @@ export default function RekapView({ logs, onRefresh }: RekapViewProps) {
                     <tr key={index} className="hover:bg-gray-50/50 transition-colors">
                       <td className="py-3.5 px-5">
                         <span className="font-semibold text-gray-700 block">{log.Bulan_Kegiatan || "Lainnya"}</span>
-                        <span className="text-[10px] text-gray-400 mt-0.5">{log.Timestamp}</span>
+                        {/* ✅ FIX: Use formatTanggal to properly parse ISO string */}
+                        <span className="text-[10px] text-gray-400 mt-0.5">{formatTanggal(log.Timestamp)}</span>
                       </td>
                       <td className="py-3.5 px-5 font-bold text-gray-800">
                         {log.Nama_Tempat}
                         <span className="text-[10px] text-gray-400 font-medium block mt-0.5">{log.Wilayah}</span>
                       </td>
-                      <td className="py-3.5 px-5 font-semibold text-gray-500">{log.Kategori}</td>
+                      {/* ✅ FIX: Show human-readable category name */}
+                      <td className="py-3.5 px-5 font-semibold text-gray-500">{formatKategori(log.Kategori)}</td>
                       <td className="py-3.5 px-5 text-center font-bold text-sky-700 text-xs">
                         {log.Total_Skor}
                       </td>
@@ -173,7 +200,8 @@ export default function RekapView({ logs, onRefresh }: RekapViewProps) {
                             className="text-[11px] font-medium text-gray-700 border border-gray-250 hover:bg-gray-50 shadow-sm bg-white px-3 py-1.5 rounded-lg inline-flex items-center gap-1.5 transition-all"
                           >
                             <FileText className="w-3.5 h-3.5 text-sky-600" />
-                            <span>Berita Acara</span>
+                            {/* ✅ FIX: Renamed from "Berita Acara" to "Laporan" */}
+                            <span>Laporan</span>
                           </button>
                         </div>
                       </td>
@@ -188,7 +216,7 @@ export default function RekapView({ logs, onRefresh }: RekapViewProps) {
 
       {/* 
         ====================================================
-        BERITA ACARA HIGH-FIDELITY OFFICIAL REPORT VIEW MODAL
+        LAPORAN HIGH-FIDELITY OFFICIAL REPORT VIEW MODAL
         ====================================================
       */}
       {selectedLog && (
@@ -201,7 +229,8 @@ export default function RekapView({ logs, onRefresh }: RekapViewProps) {
             <div className="bg-gray-50 text-gray-800 p-4 border-b border-gray-200 flex justify-between items-center print-hide">
               <div className="flex items-center gap-2">
                 <FileText className="w-4 h-4 text-sky-600" />
-                <h4 className="font-bold text-xs tracking-tight text-gray-700">Pratinjau Resmi Berita Acara (Kemenkes Format)</h4>
+                {/* ✅ FIX: Renamed header */}
+                <h4 className="font-bold text-xs tracking-tight text-gray-700">Pratinjau Resmi Laporan (Kemenkes Format)</h4>
               </div>
 
               <div className="flex gap-2">
@@ -242,10 +271,11 @@ export default function RekapView({ logs, onRefresh }: RekapViewProps) {
               {/* Document Title */}
               <div className="text-center space-y-0.5 mb-4">
                 <h3 className="font-bold text-[13px] underline inline-block tracking-tight text-center">
-                  BERITA ACARA HASIL INSPEKSI KESEHATAN LINGKUNGAN (IKL)
+                  {/* ✅ FIX: Renamed from "BERITA ACARA" to "LAPORAN" */}
+                  LAPORAN HASIL INSPEKSI KESEHATAN LINGKUNGAN (IKL)
                 </h3>
                 <div className="text-[10px]">
-                  Nomor: {selectedLog.ID_Tempat.split("-")[1]} / BKK-TBH / IKL / {new Date(selectedLog.Timestamp.replace(/(\d+)\/(\d+)\/(\d+).*/, "$3-$2-$1")).getFullYear() || new Date().getFullYear()}
+                  Nomor: {selectedLog.ID_Tempat.split("-")[1]} / BKK-TBH / IKL / {selectedLog.Timestamp.split(" ")[0].split("/")[2]}
                 </div>
               </div>
 
@@ -260,7 +290,8 @@ export default function RekapView({ logs, onRefresh }: RekapViewProps) {
                   <tr>
                     <td className="py-0.5">Kategori / Golongan</td>
                     <td className="w-[2%]">:</td>
-                    <td className="py-0.5">{selectedLog.Kategori}</td>
+                    {/* ✅ FIX: Show human-readable category in report */}
+                    <td className="py-0.5">{formatKategori(selectedLog.Kategori)}</td>
                   </tr>
                   <tr>
                     <td className="py-0.5">Wilayah Kerja Kantor</td>
@@ -278,9 +309,11 @@ export default function RekapView({ logs, onRefresh }: RekapViewProps) {
                     <td className="py-0.5">{selectedLog.Jml_Karyawan} Orang / {selectedLog.Jml_Penjamah} Orang</td>
                   </tr>
                   <tr>
-                    <td className="py-0.5">Tanggal Inspeksi Audit</td>
+                    {/* ✅ FIX: Renamed label from "Tanggal Inspeksi Audit" to "Tanggal Pemeriksaan" */}
+                    <td className="py-0.5">Tanggal Pemeriksaan</td>
                     <td className="w-[2%]">:</td>
-                    <td className="py-0.5 font-semibold">{selectedLog.Timestamp.split(" ")[0]}</td>
+                    {/* ✅ FIX: Use formatTanggal instead of split(" ")[0] */}
+                    <td className="py-0.5 font-semibold">{formatTanggal(selectedLog.Timestamp)}</td>
                   </tr>
                 </tbody>
               </table>
@@ -373,7 +406,8 @@ export default function RekapView({ logs, onRefresh }: RekapViewProps) {
                         </div>
                       ) : (
                         <div>
-                          <strong>Golongan TPP:</strong> {selectedLog.Kategori.replace("TPP_", "")} <br />
+                          {/* ✅ Improved: show full golongan label */}
+                          <strong>Golongan TPP:</strong> {selectedLog.Kategori === "TPP_A1" ? "Golongan A1" : "Golongan A2"} <br />
                           <strong>Total Poin Ketidaksesuaian/Deduction:</strong> <span className="text-red-600 font-bold">{selectedLog.Total_Nilai_Mentah} pt</span> <br />
                           <strong>Skor Kelayakan IKL:</strong> <span className="font-bold text-sky-700">{selectedLog.Total_Skor} %</span> <br />
                           <span className="text-[9px] text-gray-500 italic block mt-1">
@@ -405,7 +439,8 @@ export default function RekapView({ logs, onRefresh }: RekapViewProps) {
                       Pengelola / Penanggung Jawab Bangunan
                     </td>
                     <td className="pb-12 w-1/2">
-                      Tembilahan, {selectedLog.Timestamp.split(" ")[0]} <br />
+                      {/* ✅ FIX: Use formatTanggal for signature date */}
+                      Tembilahan, {formatTanggal(selectedLog.Timestamp)} <br />
                       {selectedLog.Jabatan_Pemeriksa || "Inspektur Kesling"}
                     </td>
                   </tr>
@@ -468,7 +503,8 @@ export default function RekapView({ logs, onRefresh }: RekapViewProps) {
                     Nama TPP/TFU: <strong className="uppercase">{selectedLog.Nama_Tempat}</strong> — {selectedLog.Wilayah}
                   </div>
                   <div className="text-xs text-gray-600">
-                    Tanggal Inspeksi: <strong>{selectedLog.Timestamp.split(" ")[0]}</strong> | Pemeriksa: <strong>{selectedLog.Nama_Pemeriksa}</strong>
+                    {/* ✅ FIX: Use formatTanggal for documentation page date */}
+                    Tanggal Inspeksi: <strong>{formatTanggal(selectedLog.Timestamp)}</strong> | Pemeriksa: <strong>{selectedLog.Nama_Pemeriksa}</strong>
                   </div>
                 </div>
 
