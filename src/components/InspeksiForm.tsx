@@ -1,22 +1,29 @@
 import React, { useState, useEffect, useRef } from "react";
 import { 
   ClipboardCheck, Info, Users, PenTool, Save, CheckCircle2, 
-  HelpCircle, ChevronDown, ListTodo, FileWarning, UploadCloud, Trash2, Camera
+  HelpCircle, ChevronDown, ListTodo, FileWarning, UploadCloud, Trash2, Camera,
+  BookMarked
 } from "lucide-react";
-import { Petugas, Tempat, KriteriaItem, DetailJawaban } from "../types";
+import { Petugas, Tempat, KriteriaItem, DetailJawaban, DraftLaporan } from "../types";
+import { saveDraft, deleteDraft, generateDraftId } from "../utils/draftStorage";
 
 interface InspeksiFormProps {
   currentWilayah: string;
   places: Tempat[];
   officers: Petugas[];
   onSuccess: () => void;
+  draftToLoad?: DraftLaporan | null;
+  onDraftSaved?: () => void;
 }
 
 export default function InspeksiForm({ 
   currentWilayah, 
   places, 
   officers, 
-  onSuccess 
+  onSuccess,
+  draftToLoad,
+  onDraftSaved
+ 
 }: InspeksiFormProps) {
   
   const [filterKategoriJenis, setFilterKategoriJenis] = useState<"" | "TPP" | "TFU">("");
@@ -37,6 +44,9 @@ export default function InspeksiForm({
   const [openSection, setOpenSection] = useState<string>("");
   const shouldScrollRef = useRef(false);
   const [submitting, setSubmitting] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
+  const [draftSavedFeedback, setDraftSavedFeedback] = useState(false);
+  const [currentDraftId, setCurrentDraftId] = useState<string | null>(null);
 
   // Drawing signature pad states for inspector and owner
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -385,7 +395,94 @@ export default function InspeksiForm({
     }));
   };
 
+  // Load draft when draftToLoad prop changes
+  useEffect(() => {
+    if (!draftToLoad) return;
+    setFilterKategoriJenis(draftToLoad.filterKategoriJenis);
+    setSelectedPlaceId(draftToLoad.selectedPlaceId);
+    setSelectedOfficerName(draftToLoad.selectedOfficerName);
+    setTanggalInspeksi(draftToLoad.tanggalInspeksi);
+    setKaryawan(draftToLoad.karyawan);
+    setPenjamah(draftToLoad.penjamah);
+    setAnswers(draftToLoad.answers);
+    setHasInspectorDrawn(draftToLoad.hasInspectorDrawn);
+    setHasOwnerDrawn(!!draftToLoad.ttdPemilikBase64);
+    setPhotos(draftToLoad.photos || []);
+    setCurrentDraftId(draftToLoad.draftId);
+  }, [draftToLoad]);
+
   const [errMassage, setErrorMassage] = useState("");
+
+  // Handle Simpan Draft — minimal: harus ada sarana + petugas terpilih
+  const handleSaveDraft = async () => {
+    if (!selectedPlace) {
+      setErrorMassage("Pilih lokasi sarana terlebih dahulu sebelum menyimpan draft.");
+      return;
+    }
+    if (!selectedOfficer) {
+      setErrorMassage("Pilih nama petugas pemeriksa sebelum menyimpan draft.");
+      return;
+    }
+
+    setSavingDraft(true);
+    setErrorMassage("");
+
+    // Hitung progress
+    const plcKategori = selectedPlace.Kategori;
+    const isTFU = plcKategori.includes("Fasilitas") || plcKategori.includes("TFU");
+    const jenisType = isTFU ? "TFU" : plcKategori.includes("A2") ? "TPP_A2" : "TPP_A1";
+    const tK = isTFU ? null : (jenisType === "TPP_A2" ? "A2" : "A1");
+
+    const totalQuestions = criteria.filter(item => {
+      if (isTFU) return item.Bobot && item.Bobot !== "";
+      if (tK) { const v = item[tK]; return v && v !== "" && v !== "NA"; }
+      return false;
+    }).length;
+
+    const answeredCount = Object.keys(answers).length;
+    const completionPercent = totalQuestions > 0
+      ? Math.round((answeredCount / totalQuestions) * 100)
+      : 0;
+
+    const isReadyToSubmit = answeredCount >= totalQuestions && totalQuestions > 0;
+
+    // Ambil TTD base64 jika sudah digambar
+    const canvas = canvasRef.current;
+    const ttdBase64 = (hasInspectorDrawn && canvas) ? canvas.toDataURL("image/png") : "";
+    const ownerCanvas = ownerCanvasRef.current;
+    const ttdPemilikBase64 = (hasOwnerDrawn && ownerCanvas) ? ownerCanvas.toDataURL("image/png") : "";
+
+    const draftId = currentDraftId ?? generateDraftId(selectedPlace.ID_Tempat);
+
+    const draft: DraftLaporan = {
+      draftId,
+      savedAt: new Date().toISOString(),
+      filterKategoriJenis,
+      selectedPlaceId,
+      selectedPlaceName: selectedPlace.Nama_Tempat,
+      selectedPlaceKategori: selectedPlace.Kategori,
+      selectedOfficerName,
+      tanggalInspeksi,
+      karyawan,
+      penjamah,
+      answers,
+      hasInspectorDrawn,
+      ttdBase64,
+      ttdPemilikBase64,
+      photos,
+      totalQuestions,
+      answeredCount,
+      completionPercent,
+      isReadyToSubmit,
+    };
+
+    saveDraft(draft);
+    setCurrentDraftId(draftId);
+    setSavingDraft(false);
+    setDraftSavedFeedback(true);
+    setTimeout(() => setDraftSavedFeedback(false), 3000);
+    if (onDraftSaved) onDraftSaved();
+  };
 
   const handleSave = async () => {
     if (!selectedPlace) {
@@ -548,6 +645,11 @@ export default function InspeksiForm({
 
       const res = await resp.json();
       if (res.status === "success") {
+        // Auto-hapus draft setelah berhasil disubmit
+        if (currentDraftId) {
+          deleteDraft(currentDraftId);
+          if (onDraftSaved) onDraftSaved(); // refresh counter badge
+        }
         alert(`Inspeksi Berhasil Disimpan!\nSkor Akhir: ${skorAkhir}\nKesimpulan: ${kesimpulan.toUpperCase()}`);
         onSuccess();
       } else {
@@ -1076,14 +1178,34 @@ export default function InspeksiForm({
             </div>
           )}
 
-          <button
-            onClick={handleSave}
-            disabled={submitting}
-            className="w-full bg-slate-900 hover:bg-sky-600 text-white font-black text-sm rounded-2xl py-4 flex items-center justify-center gap-2 transition-all shadow-lg hover:shadow-sky-100 shadow-slate-100 active:scale-95 disabled:opacity-50"
-          >
-            <Save className="w-5 h-5 animate-bounce" />
-            <span>{submitting ? "Kirim Berkas Berita Acara & Foto..." : "Simpan & Sinkronkan Hasil Penilaian Lapangan"}</span>
-          </button>
+          {/* Draft saved success feedback */}
+          {draftSavedFeedback && (
+            <div className="bg-amber-50 text-amber-800 text-xs font-bold border border-amber-200 rounded-2xl p-4 flex gap-2 items-center">
+              <BookMarked className="w-4 h-4 shrink-0 text-amber-600" />
+              <span>Draft berhasil disimpan! Lanjutkan pengisian kapan saja dari menu <strong>Draft Laporan</strong>.</span>
+            </div>
+          )}
+
+          {/* Action buttons: Simpan Draft + Submit Laporan */}
+          <div className="flex flex-col sm:flex-row gap-3">
+            <button
+              onClick={handleSaveDraft}
+              disabled={savingDraft || submitting}
+              className="flex-1 bg-white border-2 border-amber-400 hover:bg-amber-50 text-amber-700 font-black text-sm rounded-2xl py-4 flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50"
+            >
+              <BookMarked className="w-5 h-5" />
+              <span>{savingDraft ? "Menyimpan Draft..." : "Simpan Draft"}</span>
+            </button>
+
+            <button
+              onClick={handleSave}
+              disabled={submitting || savingDraft}
+              className="flex-1 bg-slate-900 hover:bg-sky-600 text-white font-black text-sm rounded-2xl py-4 flex items-center justify-center gap-2 transition-all shadow-lg hover:shadow-sky-100 shadow-slate-100 active:scale-95 disabled:opacity-50"
+            >
+              <Save className="w-5 h-5 animate-bounce" />
+              <span>{submitting ? "Mengirim Laporan..." : "Submit Laporan Final"}</span>
+            </button>
+          </div>
         </div>
       )}
     </div>
