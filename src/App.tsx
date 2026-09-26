@@ -66,6 +66,14 @@ export default function App() {
     if (typeof window === "undefined") return "";
     return localStorage.getItem("santuari_nama") || "";
   });
+  const [userNip, setUserNip] = useState(() => {
+    if (typeof window === "undefined") return "";
+    return localStorage.getItem("santuari_nip") || "";
+  });
+  const [userJabatan, setUserJabatan] = useState(() => {
+    if (typeof window === "undefined") return "";
+    return localStorage.getItem("santuari_jabatan") || "";
+  });
 
   // Keep dashboardWilayah in sync with active officer's Wilker access limit
   useEffect(() => {
@@ -143,6 +151,14 @@ export default function App() {
           localStorage.setItem("santuari_nama", dataProf.data.nama);
           setCurrentWilayah(dataProf.data.wilayah);
           localStorage.setItem("santuari_wilayah", dataProf.data.wilayah);
+          if (dataProf.data.nip) {
+            setUserNip(dataProf.data.nip);
+            localStorage.setItem("santuari_nip", dataProf.data.nip);
+          }
+          if (dataProf.data.jabatan) {
+            setUserJabatan(dataProf.data.jabatan);
+            localStorage.setItem("santuari_jabatan", dataProf.data.jabatan);
+          }
         }
       }
     } catch (err) {
@@ -190,39 +206,49 @@ export default function App() {
     synchAllData();
   }, []);
 
-  const handleLoginSuccess = useCallback((wilayah: string, token: string, usernameRes?: string, namaRes?: string) => {
+  const handleLoginSuccess = useCallback((wilayah: string, token: string, usernameRes?: string, namaRes?: string, nipRes?: string, jabatanRes?: string) => {
     setIsLoggedIn(true);
     setCurrentWilayah(wilayah);
     setUserName(usernameRes || "");
     setUserNama(namaRes || "");
+    if (nipRes) setUserNip(nipRes);
+    if (jabatanRes) setUserJabatan(jabatanRes);
     localStorage.setItem("santuari_logged_in", "true");
     localStorage.setItem("santuari_wilayah", wilayah);
     localStorage.setItem("santuari_token", token);
     localStorage.setItem("santuari_last_active", Date.now().toString());
     if (usernameRes) localStorage.setItem("santuari_username", usernameRes);
     if (namaRes) localStorage.setItem("santuari_nama", namaRes);
+    if (nipRes) localStorage.setItem("santuari_nip", nipRes);
+    if (jabatanRes) localStorage.setItem("santuari_jabatan", jabatanRes);
     setShowAuthModal(false);
+    synchAllData();
     // If Super Admin, automatically navigate to settings, otherwise dashboard
     if (wilayah === "Super Admin") {
       setActiveView("superadmin");
     } else {
       setActiveView("dashboard");
     }
-  }, []);
+  }, [synchAllData]);
 
   const handleLogout = useCallback(() => {
     setIsLoggedIn(false);
     setCurrentWilayah("");
     setUserName("");
     setUserNama("");
+    setUserNip("");
+    setUserJabatan("");
     localStorage.removeItem("santuari_logged_in");
     localStorage.removeItem("santuari_wilayah");
     localStorage.removeItem("santuari_token");
     localStorage.removeItem("santuari_last_active");
     localStorage.removeItem("santuari_username");
     localStorage.removeItem("santuari_nama");
+    localStorage.removeItem("santuari_nip");
+    localStorage.removeItem("santuari_jabatan");
     setActiveView("dashboard");
   }, []);
+
 
   return (
     <div className="flex w-screen h-screen overflow-hidden bg-gray-50 font-sans leading-normal text-gray-900 pr-sub-print">
@@ -518,6 +544,12 @@ export default function App() {
                 officers={officers}
                 draftToLoad={draftToLoad}
                 onDraftSaved={refreshDraftCount}
+                currentUser={{
+                  username: userName,
+                  nama: userNama,
+                  nip: userNip,
+                  jabatan: userJabatan
+                }}
                 onSuccess={() => {
                   synchAllData();
                   setDraftToLoad(null);
@@ -526,6 +558,7 @@ export default function App() {
                 }}
               />
             )}
+
 
             {isLoggedIn && activeView === "draft-laporan" && (
               <DraftLaporanView
