@@ -261,15 +261,16 @@ export default function App() {
       >
         <div className="space-y-6">
           {/* Logo Brand Header */}
-          <div className="flex items-center gap-3 pb-4 border-b border-gray-100">
-            <div className="w-10 h-10 bg-sky-600 rounded-lg flex items-center justify-center shadow-sm">
-              <img 
-                src="https://kespelcilacap.com/wp-content/uploads/2025/10/Logo-BKK.png" 
-                alt="Logo BKK" 
-                className="w-7 h-auto drop-shadow-sm shrink-0"
-                referrerPolicy="no-referrer"
-              />
-            </div>
+          <div className="flex items-center gap-3.5 pb-4 border-b border-gray-100">
+            <img 
+              src="/assets/logo-bkk.png" 
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = "https://kespelcilacap.com/wp-content/uploads/2025/10/Logo-BKK.png";
+              }}
+              alt="Logo BKK" 
+              className="w-12 h-12 object-contain shrink-0"
+              referrerPolicy="no-referrer"
+            />
             <div className="leading-tight">
               <h1 className="text-base font-bold tracking-tight text-gray-800">SANTUARI</h1>
               <span className="text-[10px] text-gray-400 font-bold tracking-widest block uppercase">V2.0 ENTERPRISE</span>
@@ -494,10 +495,6 @@ export default function App() {
                 👤 Wilayah Kerja: <strong className="font-extrabold">{currentWilayah}</strong>
               </span>
             )}
-            <div className="bg-white border border-gray-200 rounded-full px-3.5 py-1.5 flex items-center gap-2 text-[10px] text-gray-600 shadow-sm leading-none font-bold uppercase tracking-wider">
-              <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse shrink-0" />
-              <span>Satelit Aktif</span>
-            </div>
           </div>
         </header>
 
