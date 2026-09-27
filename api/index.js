@@ -2415,7 +2415,9 @@ app.get("/api/rekap", async (req, res) => {
         const [d, m, y] = parts.map(Number);
         return new Date(y, m - 1, d).getTime();
       };
-      return parseDate(b.Timestamp) - parseDate(a.Timestamp);
+      const diff = parseDate(b.Timestamp) - parseDate(a.Timestamp);
+      if (diff !== 0) return diff;
+      return (b.id || 0) - (a.id || 0);
     });
     res.json({ status: "success", data: processedLogs });
   } catch (err) {
@@ -2631,7 +2633,16 @@ app.post("/api/inspeksi", authenticateToken, async (req, res) => {
     const sanitizedPemeriksaNama = sanitizeString(payload.pemeriksaNama);
     const sanitizedPemeriksaNip = sanitizeString(payload.pemeriksaNip);
     const sanitizedPemeriksaJabatan = sanitizeString(payload.pemeriksaJabatan);
-    const inspectionDate = payload.tanggalInspeksi ? (/* @__PURE__ */ new Date(payload.tanggalInspeksi + "T12:00:00Z")).toISOString() : (/* @__PURE__ */ new Date()).toISOString();
+    let inspectionDate;
+    if (payload.tanggalInspeksi) {
+      if (payload.tanggalInspeksi.includes("T")) {
+        inspectionDate = new Date(payload.tanggalInspeksi).toISOString();
+      } else {
+        inspectionDate = (/* @__PURE__ */ new Date(payload.tanggalInspeksi + "T12:00:00Z")).toISOString();
+      }
+    } else {
+      inspectionDate = (/* @__PURE__ */ new Date()).toISOString();
+    }
     const inspection = {
       Timestamp: inspectionDate,
       ID_Tempat: payload.idTempat,
