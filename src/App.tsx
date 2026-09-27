@@ -268,12 +268,12 @@ export default function App() {
                 (e.target as HTMLImageElement).src = "https://kespelcilacap.com/wp-content/uploads/2025/10/Logo-BKK.png";
               }}
               alt="Logo BKK" 
-              className="w-12 h-12 object-contain shrink-0"
+              className="w-20 h-20 md:w-[86px] md:h-[86px] object-contain shrink-0 drop-shadow-sm"
               referrerPolicy="no-referrer"
             />
             <div className="leading-tight">
-              <h1 className="text-base font-bold tracking-tight text-gray-800">SANTUARI</h1>
-              <span className="text-[10px] text-gray-400 font-bold tracking-widest block uppercase">V2.0 ENTERPRISE</span>
+              <h1 className="text-lg font-black tracking-tight text-gray-800">SANTUARI</h1>
+              <span className="text-[10px] text-gray-400 font-bold tracking-widest block uppercase mt-0.5">V2.0 ENTERPRISE</span>
             </div>
           </div>
 
