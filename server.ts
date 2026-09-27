@@ -533,9 +533,16 @@ async function configureApp() {
       const sanitizedPemeriksaJabatan = sanitizeString(payload.pemeriksaJabatan);
 
       // Use user-selected date if provided; force it to noon UTC to prevent timezone shifts
-      const inspectionDate = payload.tanggalInspeksi 
-        ? new Date(payload.tanggalInspeksi + "T12:00:00Z").toISOString()
-        : new Date().toISOString();
+      let inspectionDate: string;
+      if (payload.tanggalInspeksi) {
+        if (payload.tanggalInspeksi.includes("T")) {
+          inspectionDate = new Date(payload.tanggalInspeksi).toISOString();
+        } else {
+          inspectionDate = new Date(payload.tanggalInspeksi + "T12:00:00Z").toISOString();
+        }
+      } else {
+        inspectionDate = new Date().toISOString();
+      }
 
       const inspection: LogInspeksi = {
         Timestamp: inspectionDate,
