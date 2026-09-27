@@ -281,13 +281,8 @@ export default function RekapView({ logs, onRefresh }: RekapViewProps) {
               {/* Document Title */}
               <div className="text-center space-y-0.5 mb-4">
                 <h3 className="font-bold text-[13px] underline inline-block tracking-tight text-center">
-                  {/* ✅ FIX: Renamed from "BERITA ACARA" to "LAPORAN" */}
                   LAPORAN HASIL INSPEKSI KESEHATAN LINGKUNGAN (IKL)
                 </h3>
-                <div className="text-[10px]">
-                  {/* ✅ FIX: Server sends DD/MM/YYYY — extract year from index [2] */}
-                  Nomor: {selectedLog.ID_Tempat.split("-")[1]} / BKK-TBH / IKL / {selectedLog.Timestamp.split("/")[2]?.split(" ")[0] || new Date().getFullYear()}
-                </div>
               </div>
 
               {/* Master target details */}

@@ -88,7 +88,13 @@ export default function InspeksiForm({
 
   const [karyawan, setKaryawan] = useState<number | "">("");
   const [penjamah, setPenjamah] = useState<number | "">("");
-  const [tanggalInspeksi, setTanggalInspeksi] = useState(() => new Date().toISOString().split("T")[0]); // YYYY-MM-DD
+  const [tanggalInspeksi, setTanggalInspeksi] = useState(() => {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, "0");
+    const d = String(now.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  });
   
   const [criteria, setCriteria] = useState<KriteriaItem[]>([]);
   const [answers, setAnswers] = useState<Record<string, { value: number; teks: string; item: KriteriaItem }>>({});
